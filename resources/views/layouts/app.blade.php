@@ -55,12 +55,6 @@
                 overflow-x: hidden;
             }
             
-            /* Ensure submenu appears above all content */
-            .submenu-modal {
-                z-index: 9999 !important;
-                position: fixed !important;
-            }
-            
             /* Prevent main content from overlapping submenu */
             .main-content-wrapper {
                 position: relative;

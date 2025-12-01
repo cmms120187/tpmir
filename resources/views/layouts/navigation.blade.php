@@ -289,11 +289,8 @@
                             </a>
                         </li>
                     @else
-                        <li x-data="{ 
-                            open: false,
-                            menuTop: 0
-                        }" 
-                            class="relative group-menu"
+                        <li x-data="{ open: false }" 
+                            class="relative"
                             @close-other-submenus.window="
                                 if ($event.detail !== '{{ $menu['name'] }}') {
                                     open = false;
@@ -304,10 +301,6 @@
                                     // Close other submenus
                                     $dispatch('close-other-submenus', '{{ $menu['name'] }}');
                                     // Toggle this submenu
-                                    if (!open) {
-                                        const rect = $el.closest('li').getBoundingClientRect();
-                                        menuTop = Math.max(0, rect.top);
-                                    }
                                     open = !open;
                                  ">
                                 <div class="flex items-center flex-1 min-w-0">
@@ -322,44 +315,31 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                 </svg>
                             </div>
-                            <!-- Submenu Modal - appears on the right -->
-                            <div x-show="open" 
+                            <!-- Submenu Dropdown - appears below -->
+                            <ul x-show="open" 
                                 x-cloak
                                 @click.away="open = false"
                                 x-transition:enter="transition ease-out duration-200"
-                                x-transition:enter-start="opacity-0 transform translate-x-4"
-                                x-transition:enter-end="opacity-100 transform translate-x-0"
+                                x-transition:enter-start="opacity-0 transform -translate-y-2"
+                                x-transition:enter-end="opacity-100 transform translate-y-0"
                                 x-transition:leave="transition ease-in duration-150"
-                                x-transition:leave-start="opacity-100 transform translate-x-0"
-                                x-transition:leave-end="opacity-0 transform translate-x-4"
-                                class="fixed bg-white shadow-2xl border-l border-gray-200 overflow-y-auto"
-                                style="z-index: 9999; display: none;"
-                                :style="`left: 230px; top: ${menuTop}px; width: 280px; max-height: calc(100vh - ${menuTop}px);`">
-                                <div class="p-4 border-b border-gray-200 bg-blue-50 sticky top-0 z-10">
-                                    <div class="flex items-center justify-between">
-                                        <h3 class="font-semibold text-gray-800 text-sm sm:text-base">{{ $menu['name'] }}</h3>
-                                        <button @click.stop="open = false" class="text-gray-500 hover:text-gray-700 transition-colors">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                                <ul class="p-2 space-y-1">
-                                    @foreach($menu['children'] as $child)
-                                        <li>
-                                            <a href="{{ $child['route'] }}"
-                                                @click="sidebarOpen = false; open = false"
-                                                class="flex items-center px-3 py-2.5 rounded-lg transition-colors duration-150 hover:bg-blue-100 hover:text-blue-700 text-sm {{ isMenuActive($child['route'], $child['name'], $currentUrl) ? 'bg-blue-600 text-white' : 'text-gray-700' }}">
-                                                <span class="mr-3">
-                                                    @include('layouts.partials.menu-icon', ['icon' => $child['icon']])
-                                                </span>
-                                                <span>{{ $child['name'] }}</span>
-                                            </a>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            </div>
+                                x-transition:leave-start="opacity-100 transform translate-y-0"
+                                x-transition:leave-end="opacity-0 transform -translate-y-2"
+                                class="ml-4 mt-1 space-y-0.5 border-l-2 border-blue-200 pl-2"
+                                style="display: none;">
+                                @foreach($menu['children'] as $child)
+                                    <li>
+                                        <a href="{{ $child['route'] }}"
+                                            @click="sidebarOpen = false; open = false"
+                                            class="flex items-center px-2 sm:px-3 py-2 rounded-lg transition-colors duration-150 hover:bg-blue-100 hover:text-blue-700 text-sm {{ isMenuActive($child['route'], $child['name'], $currentUrl) ? 'bg-blue-600 text-white' : 'text-gray-700' }}">
+                                            <span class="flex-shrink-0 mr-3">
+                                                @include('layouts.partials.menu-icon', ['icon' => $child['icon']])
+                                            </span>
+                                            <span>{{ $child['name'] }}</span>
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
                         </li>
                     @endif
                 @endforeach
