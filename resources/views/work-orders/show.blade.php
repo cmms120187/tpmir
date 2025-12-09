@@ -177,13 +177,13 @@
                     @if($workOrder->photo_before)
                     <div>
                         <label class="block text-sm font-medium text-gray-500 mb-2">Photo Before</label>
-                        <img src="{{ asset('storage/' . $workOrder->photo_before) }}" alt="Photo Before" class="w-full rounded border-2 border-gray-300">
+                        <img src="{{ asset('public-storage/' . $workOrder->photo_before) }}" alt="Photo Before" class="w-full rounded border-2 border-gray-300" onerror="this.style.display='none'">
                     </div>
                     @endif
                     @if($workOrder->photo_after)
                     <div>
                         <label class="block text-sm font-medium text-gray-500 mb-2">Photo After</label>
-                        <img src="{{ asset('storage/' . $workOrder->photo_after) }}" alt="Photo After" class="w-full rounded border-2 border-gray-300">
+                        <img src="{{ asset('public-storage/' . $workOrder->photo_after) }}" alt="Photo After" class="w-full rounded border-2 border-gray-300" onerror="this.style.display='none'">
                     </div>
                     @endif
                 </div>

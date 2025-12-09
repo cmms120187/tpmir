@@ -387,7 +387,7 @@ class ControllingController extends Controller
                     'maintenance_point_id' => $schedule->maintenance_point_id,
                     'maintenance_point_name' => $schedule->maintenancePoint ? $schedule->maintenancePoint->name : $schedule->title,
                     'instruction' => $schedule->description,
-                    'photo' => $schedule->maintenancePoint && $schedule->maintenancePoint->photo ? Storage::url($schedule->maintenancePoint->photo) : null,
+                    'photo' => $schedule->maintenancePoint && $schedule->maintenancePoint->photo ? asset('public-storage/' . $schedule->maintenancePoint->photo) : null,
                     'has_execution' => $hasExecution,
                     'execution_id' => $execution ? $execution->id : null,
                     'execution_status' => $execution ? $execution->status : 'pending',

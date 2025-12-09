@@ -123,6 +123,15 @@
                                 ['name' => 'Work Orders', 'route' => '/work-orders', 'icon' => 'clipboard-list', 'menu_key' => 'work-orders'],
                             ]
                         ],
+                        [
+                            'name' => 'Production',
+                            'icon' => 'chart-bar',
+                            'type' => 'group',
+                            'menu_key' => 'production',
+                            'children' => [
+                                ['name' => 'Hasil Produksi Per Jam', 'route' => '/production-hourly', 'icon' => 'clock', 'menu_key' => 'production-hourly'],
+                            ]
+                        ],
                         // [
                         //     'name' => 'Downtime ERP2',
                         //     'route' => route('downtime-erp2.index'),

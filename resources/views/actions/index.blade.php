@@ -16,24 +16,49 @@
         @endif
         <div class="bg-white rounded-lg shadow p-4 sm:p-6 overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
+                <thead class="bg-blue-600">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Updated At</th>
-                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">No</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">System</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Problem</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Reason</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Action Name</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     @forelse($actions as $action)
                     <tr class="{{ $loop->even ? 'bg-gray-50' : 'bg-white' }} hover:bg-gray-100 transition-colors">
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ $loop->iteration + ($actions->currentPage() - 1) * $actions->perPage() }}</td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ $action->id }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            @if($action->system)
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    {{ $action->system->nama_sistem }}
+                                </span>
+                            @else
+                                <span class="text-gray-400">-</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            @if($action->problem)
+                                <div class="flex flex-col">
+                                    @if($action->problem->problem_header)
+                                        <span class="font-semibold text-gray-900">{{ $action->problem->problem_header }}</span>
+                                    @endif
+                                    <span class="text-gray-600">{{ $action->problem->name }}</span>
+                                </div>
+                            @else
+                                <span class="text-gray-400">-</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            @if($action->reason)
+                                <span class="text-gray-900">{{ $action->reason->name }}</span>
+                            @else
+                                <span class="text-gray-400">-</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{{ $action->name }}</td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ $action->created_at ? $action->created_at->format('Y-m-d H:i') : '-' }}</td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ $action->updated_at ? $action->updated_at->format('Y-m-d H:i') : '-' }}</td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-center">
                             <div class="flex flex-row justify-center items-center gap-2">
                                 <a href="{{ route('actions.edit', $action->id) }}" class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white p-2 rounded shadow transition duration-150 ease-in-out" title="Edit">

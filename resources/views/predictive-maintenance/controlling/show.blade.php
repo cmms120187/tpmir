@@ -171,13 +171,13 @@
                 @if($execution->photo_before)
                 <div>
                     <label class="block text-sm font-medium text-gray-500 mb-2">Photo Before</label>
-                    <img src="{{ asset('storage/' . $execution->photo_before) }}" alt="Photo Before" class="w-full h-64 object-cover rounded border">
+                    <img src="{{ Storage::disk('public')->url($execution->photo_before) }}" alt="Photo Before" class="w-full h-64 object-cover rounded border">
                 </div>
                 @endif
                 @if($execution->photo_after)
                 <div>
                     <label class="block text-sm font-medium text-gray-500 mb-2">Photo After</label>
-                    <img src="{{ asset('storage/' . $execution->photo_after) }}" alt="Photo After" class="w-full h-64 object-cover rounded border">
+                    <img src="{{ Storage::disk('public')->url($execution->photo_after) }}" alt="Photo After" class="w-full h-64 object-cover rounded border">
                 </div>
                 @endif
             </div>

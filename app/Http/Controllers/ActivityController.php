@@ -242,14 +242,6 @@ class ActivityController extends Controller
             'existing_photos.*' => 'nullable|string',
         ]);
 
-        // Validate max 3 photos
-        if ($request->hasFile('photos')) {
-            $photosCount = count($request->file('photos'));
-            if ($photosCount > 3) {
-                return back()->withInput()->withErrors(['photos' => 'Maximum 3 photos allowed.']);
-            }
-        }
-
         // Calculate duration if not provided
         if (empty($validated['duration']) && !empty($validated['start']) && !empty($validated['stop'])) {
             $validated['duration'] = $this->calculateDuration($validated['start'], $validated['stop']);
@@ -261,12 +253,23 @@ class ActivityController extends Controller
         // Get existing photos that are kept (from form)
         $keptExistingPhotos = $request->input('existing_photos', []);
         
+        // Validate total photos (existing + new) doesn't exceed 3
+        $existingCount = count($keptExistingPhotos);
+        $newPhotosCount = $request->hasFile('photos') ? count($request->file('photos')) : 0;
+        $totalPhotos = $existingCount + $newPhotosCount;
+        
+        if ($totalPhotos > 3) {
+            return back()->withInput()->withErrors(['photos' => 'Maximum 3 photos allowed (including existing photos).']);
+        }
+        
         // Get new photos from upload
         $newPhotos = [];
         if ($request->hasFile('photos')) {
             foreach ($request->file('photos') as $photo) {
                 $photoPath = ImageHelper::convertToWebP($photo, 'activities', 85);
-                $newPhotos[] = $photoPath;
+                if ($photoPath) {
+                    $newPhotos[] = $photoPath;
+                }
             }
         }
             
@@ -477,6 +480,11 @@ class ActivityController extends Controller
      */
     public function download()
     {
+        // Check if user is admin
+        if (!auth()->check() || !auth()->user()->isAdmin()) {
+            abort(403, 'Unauthorized. Only admin can download Excel file.');
+        }
+        
         try {
             $activities = Activity::orderBy('date', 'desc')->orderBy('start', 'desc')->get();
             
@@ -534,15 +542,32 @@ class ActivityController extends Controller
             
             // Create temporary file
             $tempFile = tempnam(sys_get_temp_dir(), 'activities_');
+            if ($tempFile === false) {
+                throw new \Exception('Failed to create temporary file');
+            }
+            
             $writer = new Xlsx($spreadsheet);
             $writer->save($tempFile);
+            
+            if (!file_exists($tempFile)) {
+                throw new \Exception('Failed to save Excel file');
+            }
             
             return response()->download($tempFile, $filename, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             ])->deleteFileAfterSend(true);
         } catch (\Exception $e) {
-            \Log::error('Error downloading Excel file: ' . $e->getMessage());
-            return back()->withErrors(['error' => 'Error generating Excel file: ' . $e->getMessage()]);
+            \Log::error('Error downloading Excel file: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            // If we're in a request that can go back, redirect back with error
+            if (request()->expectsJson()) {
+                return response()->json(['error' => 'Error generating Excel file: ' . $e->getMessage()], 500);
+            }
+            
+            return redirect()->route('activities.index')
+                ->with('error', 'Error generating Excel file: ' . $e->getMessage());
         }
     }
 

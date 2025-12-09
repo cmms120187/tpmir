@@ -150,10 +150,10 @@
                             {{ $machine->machineType->name ?? '-' }}
                         </td>
                         <td class="px-3 py-3 text-sm text-gray-500" style="word-wrap: break-word; overflow-wrap: break-word;">
-                            {{ $machine->plant->name ?? '-' }}
+                            {{ $machine->plant_name ?? '-' }}
                         </td>
                         <td class="px-3 py-3 text-sm text-gray-500" style="word-wrap: break-word; overflow-wrap: break-word;">
-                            {{ $machine->line->name ?? '-' }}
+                            {{ $machine->line_name ?? '-' }}
                         </td>
                         <td class="px-3 py-3 text-sm text-gray-500" style="word-wrap: break-word; overflow-wrap: break-word;">
                             {{ $data['pic_name'] ?? '-' }}
@@ -191,7 +191,7 @@
                                             $hasPartialCompletion = false;
                                             if ($isPast) {
                                                 // Cari semua schedule dengan start_date = tanggal ini untuk machine ini
-                                                $schedulesForDate = \App\Models\PreventiveMaintenanceSchedule::where('machine_id', $machine->id)
+                                                $schedulesForDate = \App\Models\PreventiveMaintenanceSchedule::where('machine_erp_id', $machine->id)
                                                     ->where('start_date', $date)
                                                     ->where('status', 'active')
                                                     ->get();

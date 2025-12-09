@@ -11,6 +11,9 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ControllingController extends Controller
 {
@@ -37,7 +40,7 @@ class ControllingController extends Controller
         // Get all active schedules grouped by machine, filtered by month and year
         $schedules = PredictiveMaintenanceSchedule::where('status', 'active')
             ->whereBetween('start_date', [$startDate->toDateString(), $endDate->toDateString()])
-            ->with(['machineErp.roomErp', 'machineErp.machineType', 'standard', 'assignedUser', 'executions'])
+            ->with(['machineErp.roomErp', 'machineErp.machineType', 'standard', 'assignedUser', 'executions', 'maintenancePoint'])
             ->orderBy('start_date', 'asc')
             ->get();
         
@@ -140,30 +143,71 @@ class ControllingController extends Controller
                 $machinesData[$machineId]['completion_percentage'] = 0;
             }
             
-            // Determine machine condition based on latest completed executions
-            // Priority: critical > warning > normal > no data
-            $machineCondition = 'no_data'; // default: no measurement data
-            $latestExecutions = [];
+            // Determine machine condition per maintenance point
+            // Group schedules by maintenance_point_id to get condition per point
+            $maintenancePointsConditions = [];
             
             foreach ($data['schedules'] as $schedule) {
+                $pointId = $schedule->maintenance_point_id ?? 'no_point_' . $schedule->id;
+                $pointName = $schedule->maintenancePoint->name ?? $schedule->title ?? 'Point ' . $schedule->id;
+                
                 // Get latest completed execution for this schedule
                 $latestExecution = $schedule->executions
                     ->where('status', 'completed')
                     ->sortByDesc('created_at')
                     ->first();
                 
-                if ($latestExecution && $latestExecution->measurement_status) {
-                    $latestExecutions[] = $latestExecution->measurement_status;
+                // Recalculate measurement_status if standard exists and measured_value exists
+                $condition = 'no_data';
+                if ($latestExecution && $latestExecution->measured_value !== null && $schedule->standard) {
+                    $condition = $schedule->standard->getMeasurementStatus($latestExecution->measured_value);
+                    
+                    // Update the execution's measurement_status if it's different
+                    if ($latestExecution->measurement_status !== $condition) {
+                        $latestExecution->measurement_status = $condition;
+                        $latestExecution->save();
+                    }
+                } elseif ($latestExecution && $latestExecution->measurement_status) {
+                    $condition = $latestExecution->measurement_status;
+                }
+                
+                // Store condition per point (keep the worst condition if multiple schedules for same point)
+                if (!isset($maintenancePointsConditions[$pointId])) {
+                    $maintenancePointsConditions[$pointId] = [
+                        'point_id' => $pointId,
+                        'point_name' => $pointName,
+                        'condition' => $condition,
+                        'order' => $schedule->maintenancePoint->sequence ?? 999, // Use sequence for ordering
+                    ];
+                } else {
+                    // Update to worst condition (critical > caution > warning > normal > no_data)
+                    $currentCondition = $maintenancePointsConditions[$pointId]['condition'];
+                    if ($condition == 'critical' || 
+                        ($condition == 'caution' && !in_array($currentCondition, ['critical'])) ||
+                        ($condition == 'warning' && !in_array($currentCondition, ['critical', 'caution'])) ||
+                        ($condition == 'normal' && $currentCondition == 'no_data')) {
+                        $maintenancePointsConditions[$pointId]['condition'] = $condition;
+                    }
                 }
             }
             
-            // Determine worst condition (critical > warning > normal)
-            if (!empty($latestExecutions)) {
-                if (in_array('critical', $latestExecutions)) {
+            // Sort by sequence/order and store maintenance points conditions
+            usort($maintenancePointsConditions, function($a, $b) {
+                return ($a['order'] ?? 999) <=> ($b['order'] ?? 999);
+            });
+            $machinesData[$machineId]['maintenance_points_conditions'] = array_values($maintenancePointsConditions);
+            
+            // Determine overall machine condition (worst case) for backward compatibility
+            $machineCondition = 'no_data';
+            if (!empty($maintenancePointsConditions)) {
+                $allConditions = array_column($maintenancePointsConditions, 'condition');
+                if (in_array('critical', $allConditions)) {
                     $machineCondition = 'critical';
-                } elseif (in_array('warning', $latestExecutions)) {
+                } elseif (in_array('caution', $allConditions)) {
+                    $machineCondition = 'caution';
+                } elseif (in_array('warning', $allConditions)) {
                     $machineCondition = 'warning';
-                } else {
+                } elseif (in_array('normal', $allConditions)) {
                     $machineCondition = 'normal';
                 }
             }
@@ -340,7 +384,7 @@ class ControllingController extends Controller
             $executionId = $executionData['execution_id'] ?? null;
             
             if ($executionId) {
-                // Update existing execution
+                // Update existing execution by ID
                 $execution = PredictiveMaintenanceExecution::findOrFail($executionId);
                 $execution->update([
                     'status' => $executionData['status'],
@@ -350,16 +394,33 @@ class ControllingController extends Controller
                 ]);
                 $executionsCreated++;
             } else {
-                // Create new execution
-                PredictiveMaintenanceExecution::create([
-                    'schedule_id' => $executionData['schedule_id'],
-                    'scheduled_date' => $validated['scheduled_date'],
-                    'status' => $executionData['status'],
-                    'measured_value' => $measuredValue,
-                    'measurement_status' => $measurementStatus,
-                    'performed_by' => $validated['performed_by'] ?? null,
-                ]);
-                $executionsCreated++;
+                // Check if execution already exists for this schedule_id and scheduled_date
+                // 1 jadwal = 1 execution (update existing, don't create duplicate)
+                $existingExecution = PredictiveMaintenanceExecution::where('schedule_id', $executionData['schedule_id'])
+                    ->where('scheduled_date', $validated['scheduled_date'])
+                    ->first();
+                
+                if ($existingExecution) {
+                    // Update existing execution (same jadwal, just update status)
+                    $existingExecution->update([
+                        'status' => $executionData['status'],
+                        'measured_value' => $measuredValue,
+                        'measurement_status' => $measurementStatus,
+                        'performed_by' => $validated['performed_by'] ?? $existingExecution->performed_by,
+                    ]);
+                    $executionsCreated++;
+                } else {
+                    // Create new execution only if doesn't exist
+                    PredictiveMaintenanceExecution::create([
+                        'schedule_id' => $executionData['schedule_id'],
+                        'scheduled_date' => $validated['scheduled_date'],
+                        'status' => $executionData['status'],
+                        'measured_value' => $measuredValue,
+                        'measurement_status' => $measurementStatus,
+                        'performed_by' => $validated['performed_by'] ?? null,
+                    ]);
+                    $executionsCreated++;
+                }
             }
         }
 
@@ -523,19 +584,38 @@ class ControllingController extends Controller
                 if (!$maintenancePointsData[$pointId]['latest_execution'] || 
                     $latestExecution->created_at > $maintenancePointsData[$pointId]['latest_execution']->created_at) {
                     $maintenancePointsData[$pointId]['latest_execution'] = $latestExecution;
-                    $maintenancePointsData[$pointId]['condition'] = $latestExecution->measurement_status ?? 'no_data';
+                    
+                    // Recalculate measurement_status if standard exists and measured_value exists
+                    // This ensures we use the latest logic with zones
+                    $condition = 'no_data';
+                    if ($latestExecution->measured_value !== null && $schedule->standard) {
+                        $condition = $schedule->standard->getMeasurementStatus($latestExecution->measured_value);
+                        
+                        // Update the execution's measurement_status if it's different
+                        if ($latestExecution->measurement_status !== $condition) {
+                            $latestExecution->measurement_status = $condition;
+                            $latestExecution->save();
+                        }
+                    } else {
+                        $condition = $latestExecution->measurement_status ?? 'no_data';
+                    }
+                    
+                    $maintenancePointsData[$pointId]['condition'] = $condition;
                 }
             }
         }
         
         // Determine overall machine condition (worst case)
+        // Priority: critical > caution > warning > normal > no_data
         $overallCondition = 'no_data';
         foreach ($maintenancePointsData as $pointData) {
             $pointCondition = $pointData['condition'];
             if ($pointCondition == 'critical') {
                 $overallCondition = 'critical';
                 break; // Critical is worst, no need to check further
-            } elseif ($pointCondition == 'warning' && $overallCondition != 'critical') {
+            } elseif ($pointCondition == 'caution' && $overallCondition != 'critical') {
+                $overallCondition = 'caution';
+            } elseif ($pointCondition == 'warning' && $overallCondition != 'critical' && $overallCondition != 'caution') {
                 $overallCondition = 'warning';
             } elseif ($pointCondition == 'normal' && $overallCondition == 'no_data') {
                 $overallCondition = 'normal';
@@ -686,14 +766,14 @@ class ControllingController extends Controller
                     'standard_max' => $schedule->standard ? $schedule->standard->max_value : null,
                     'standard_target' => $schedule->standard ? $schedule->standard->target_value : null,
                     'instruction' => $schedule->description ?? ($schedule->maintenancePoint ? $schedule->maintenancePoint->instruction : ''),
-                    'photo' => $schedule->maintenancePoint && $schedule->maintenancePoint->photo ? Storage::url($schedule->maintenancePoint->photo) : null,
+                    'photo' => $schedule->maintenancePoint && $schedule->maintenancePoint->photo ? asset('public-storage/' . $schedule->maintenancePoint->photo) : null,
                     'has_execution' => $hasExecution,
                     'execution_id' => $execution ? $execution->id : null,
                     'execution_status' => $execution ? $execution->status : 'pending',
                     'measured_value' => $execution ? $execution->measured_value : null,
                     'measurement_status' => $execution ? $execution->measurement_status : null,
                     'is_overdue' => $isOverdue,
-                    'original_start_date' => $schedule->start_date->format('Y-m-d'),
+                    'original_start_date' => $schedule->start_date ? ($schedule->start_date instanceof Carbon ? $schedule->start_date->format('Y-m-d') : Carbon::parse($schedule->start_date)->format('Y-m-d')) : '',
                 ];
             });
             
@@ -705,6 +785,432 @@ class ControllingController extends Controller
         } catch (\Exception $e) {
             \Log::error('Error in getMaintenancePointsByMachineAndDate (Predictive)', ['error' => $e->getMessage()]);
             return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+    
+    /**
+     * Export predictive maintenance executions to Excel
+     */
+    public function export(Request $request)
+    {
+        try {
+            // Get filter parameters
+            $filterMonth = $request->get('month', session('predictive_controlling_filter_month', now()->month));
+            $filterYear = $request->get('year', session('predictive_controlling_filter_year', now()->year));
+            
+            // Calculate start and end date for the selected month
+            $startDate = Carbon::create($filterYear, $filterMonth, 1)->startOfMonth();
+            $endDate = Carbon::create($filterYear, $filterMonth, 1)->endOfMonth();
+            
+            // Get executions with relationships
+            $executions = PredictiveMaintenanceExecution::whereHas('schedule', function($q) use ($startDate, $endDate) {
+                $q->where('status', 'active')
+                  ->whereBetween('start_date', [$startDate->toDateString(), $endDate->toDateString()]);
+            })
+            ->with([
+                'schedule.machineErp.machineType',
+                'schedule.machineErp.roomErp',
+                'schedule.maintenancePoint',
+                'schedule.standard',
+                'performedBy'
+            ])
+            ->orderBy('scheduled_date', 'asc')
+            ->orderBy('created_at', 'asc')
+            ->get();
+            
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            
+            // Set header
+            $sheet->setCellValue('A1', 'Schedule ID');
+            $sheet->setCellValue('B1', 'Scheduled Date');
+            $sheet->setCellValue('C1', 'ID Mesin');
+            $sheet->setCellValue('D1', 'Nama Mesin');
+            $sheet->setCellValue('E1', 'Plant');
+            $sheet->setCellValue('F1', 'Process');
+            $sheet->setCellValue('G1', 'Line');
+            $sheet->setCellValue('H1', 'Room');
+            $sheet->setCellValue('I1', 'Maintenance Point');
+            $sheet->setCellValue('J1', 'Standard Name');
+            $sheet->setCellValue('K1', 'Status');
+            $sheet->setCellValue('L1', 'Actual Start Time');
+            $sheet->setCellValue('M1', 'Actual End Time');
+            $sheet->setCellValue('N1', 'Performed By (NIK)');
+            $sheet->setCellValue('O1', 'Performed By (Name)');
+            $sheet->setCellValue('P1', 'Measured Value');
+            $sheet->setCellValue('Q1', 'Measurement Status');
+            $sheet->setCellValue('R1', 'Findings');
+            $sheet->setCellValue('S1', 'Actions Taken');
+            $sheet->setCellValue('T1', 'Notes');
+            $sheet->setCellValue('U1', 'Cost');
+            
+            // Style header
+            $headerStyle = [
+                'fill' => [
+                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '4472C4']
+                ],
+                'font' => ['color' => ['rgb' => 'FFFFFF'], 'bold' => true],
+            ];
+            $sheet->getStyle('A1:U1')->applyFromArray($headerStyle);
+            
+            // Write data
+            $row = 2;
+            foreach ($executions as $execution) {
+                $schedule = $execution->schedule;
+                if (!$schedule) {
+                    continue;
+                }
+                
+                $machine = $schedule->machineErp ?? null;
+                
+                $scheduledDate = '';
+                if ($execution->scheduled_date) {
+                    $scheduledDate = $execution->scheduled_date instanceof Carbon 
+                        ? $execution->scheduled_date->format('Y-m-d') 
+                        : Carbon::parse($execution->scheduled_date)->format('Y-m-d');
+                }
+                
+                $actualStartTime = '';
+                if ($execution->actual_start_time) {
+                    $actualStartTime = $execution->actual_start_time instanceof Carbon 
+                        ? $execution->actual_start_time->format('Y-m-d H:i:s') 
+                        : Carbon::parse($execution->actual_start_time)->format('Y-m-d H:i:s');
+                }
+                
+                $actualEndTime = '';
+                if ($execution->actual_end_time) {
+                    $actualEndTime = $execution->actual_end_time instanceof Carbon 
+                        ? $execution->actual_end_time->format('Y-m-d H:i:s') 
+                        : Carbon::parse($execution->actual_end_time)->format('Y-m-d H:i:s');
+                }
+                
+                $sheet->setCellValue('A' . $row, $schedule->id ?? '');
+                $sheet->setCellValue('B' . $row, $scheduledDate);
+                $sheet->setCellValue('C' . $row, $machine ? ($machine->idMachine ?? '') : '');
+                $sheet->setCellValue('D' . $row, $machine && $machine->machineType ? ($machine->machineType->name ?? '') : '');
+                $sheet->setCellValue('E' . $row, $machine ? ($machine->plant_name ?? '') : '');
+                $sheet->setCellValue('F' . $row, $machine ? ($machine->process_name ?? '') : '');
+                $sheet->setCellValue('G' . $row, $machine ? ($machine->line_name ?? '') : '');
+                $sheet->setCellValue('H' . $row, $machine && $machine->roomErp ? ($machine->roomErp->name ?? '') : '');
+                $sheet->setCellValue('I' . $row, $schedule->maintenancePoint ? ($schedule->maintenancePoint->name ?? '') : ($schedule->title ?? ''));
+                $sheet->setCellValue('J' . $row, $schedule->standard ? ($schedule->standard->name ?? '') : '');
+                $sheet->setCellValue('K' . $row, ucfirst(str_replace('_', ' ', $execution->status ?? '')));
+                $sheet->setCellValue('L' . $row, $actualStartTime);
+                $sheet->setCellValue('M' . $row, $actualEndTime);
+                $sheet->setCellValue('N' . $row, $execution->performedBy ? ($execution->performedBy->nik ?? '') : '');
+                $sheet->setCellValue('O' . $row, $execution->performedBy ? ($execution->performedBy->name ?? '') : '');
+                $sheet->setCellValue('P' . $row, $execution->measured_value ?? '');
+                $sheet->setCellValue('Q' . $row, ucfirst($execution->measurement_status ?? ''));
+                $sheet->setCellValue('R' . $row, $execution->findings ?? '');
+                $sheet->setCellValue('S' . $row, $execution->actions_taken ?? '');
+                $sheet->setCellValue('T' . $row, $execution->notes ?? '');
+                $sheet->setCellValue('U' . $row, $execution->cost ?? '');
+                $row++;
+            }
+            
+            // Auto-size columns
+            foreach (range('A', 'U') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+            
+            $filename = 'predictive_maintenance_executions_' . $filterYear . '_' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '_' . date('His') . '.xlsx';
+            
+            // Create temporary file
+            $tempFile = tempnam(sys_get_temp_dir(), 'pm_executions_');
+            if ($tempFile === false) {
+                throw new \Exception('Failed to create temporary file');
+            }
+            
+            $writer = new Xlsx($spreadsheet);
+            $writer->save($tempFile);
+            
+            if (!file_exists($tempFile)) {
+                throw new \Exception('Failed to save Excel file');
+            }
+            
+            return response()->download($tempFile, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])->deleteFileAfterSend(true);
+        } catch (\Exception $e) {
+            \Log::error('Error exporting predictive maintenance executions: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return redirect()->route('predictive-maintenance.controlling.index')
+                ->with('error', 'Error generating Excel file: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Import predictive maintenance executions from Excel
+     */
+    public function import(Request $request)
+    {
+        $request->validate([
+            'excel_file' => 'required|file|mimes:xlsx,xls|max:10240', // Max 10MB
+        ]);
+
+        try {
+            $file = $request->file('excel_file');
+            $spreadsheet = IOFactory::load($file->getRealPath());
+            $worksheet = $spreadsheet->getActiveSheet();
+            
+            // Get header row (first row)
+            $header = [];
+            $highestColumn = $worksheet->getHighestColumn();
+            $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
+            
+            // Read header from row 1
+            for ($col = 1; $col <= $highestColumnIndex; $col++) {
+                $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
+                $cellValue = $worksheet->getCell($columnLetter . '1')->getValue();
+                $header[] = trim($cellValue ?? '');
+            }
+            
+            if (empty($header) || count($header) < 1) {
+                return back()->withErrors(['excel_file' => 'Invalid Excel format. Please check the file format.']);
+            }
+            
+            // Map header to column index
+            $headerMap = [];
+            foreach ($header as $index => $headerName) {
+                $headerMap[strtolower(trim($headerName))] = $index;
+            }
+            
+            $rowCount = 0;
+            $errorCount = 0;
+            $errors = [];
+            $highestRow = $worksheet->getHighestRow();
+            
+            // Start from row 2 (skip header)
+            for ($row = 2; $row <= $highestRow; $row++) {
+                try {
+                    // Read row data
+                    $rowData = [];
+                    for ($col = 1; $col <= $highestColumnIndex; $col++) {
+                        $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
+                        $cellValue = $worksheet->getCell($columnLetter . $row)->getValue();
+                        $rowData[] = $cellValue;
+                    }
+                    
+                    // Get values by header name
+                    $getValue = function($headerName) use ($headerMap, $rowData) {
+                        $index = $headerMap[strtolower(trim($headerName))] ?? null;
+                        return $index !== null ? trim($rowData[$index] ?? '') : '';
+                    };
+                    
+                    // Required fields
+                    $scheduleId = $getValue('Schedule ID');
+                    $scheduledDate = $getValue('Scheduled Date');
+                    $status = $getValue('Status');
+                    
+                    if (empty($scheduleId) || empty($scheduledDate) || empty($status)) {
+                        $errorCount++;
+                        $errors[] = "Row $row: Missing required fields (Schedule ID, Scheduled Date, or Status)";
+                        continue;
+                    }
+                    
+                    // Find schedule
+                    $schedule = PredictiveMaintenanceSchedule::find($scheduleId);
+                    if (!$schedule) {
+                        $errorCount++;
+                        $errors[] = "Row $row: Schedule ID $scheduleId not found";
+                        continue;
+                    }
+                    
+                    // Parse scheduled date
+                    $scheduledDateParsed = $this->parseDate($scheduledDate);
+                    if (!$scheduledDateParsed) {
+                        $errorCount++;
+                        $errors[] = "Row $row: Invalid Scheduled Date format";
+                        continue;
+                    }
+                    
+                    // Parse status
+                    $statusNormalized = strtolower(str_replace(' ', '_', $status));
+                    if (!in_array($statusNormalized, ['pending', 'in_progress', 'completed', 'skipped', 'cancelled'])) {
+                        $errorCount++;
+                        $errors[] = "Row $row: Invalid Status. Must be: pending, in_progress, completed, skipped, or cancelled";
+                        continue;
+                    }
+                    
+                    // Get or create execution
+                    $execution = PredictiveMaintenanceExecution::where('schedule_id', $scheduleId)
+                        ->where('scheduled_date', $scheduledDateParsed)
+                        ->first();
+                    
+                    // Prepare execution data
+                    $executionData = [
+                        'schedule_id' => $scheduleId,
+                        'scheduled_date' => $scheduledDateParsed,
+                        'status' => $statusNormalized,
+                    ];
+                    
+                    // Optional fields
+                    $actualStartTime = $getValue('Actual Start Time');
+                    if (!empty($actualStartTime)) {
+                        $parsedStartTime = $this->parseDateTime($actualStartTime);
+                        if ($parsedStartTime) {
+                            $executionData['actual_start_time'] = $parsedStartTime;
+                        }
+                    }
+                    
+                    $actualEndTime = $getValue('Actual End Time');
+                    if (!empty($actualEndTime)) {
+                        $parsedEndTime = $this->parseDateTime($actualEndTime);
+                        if ($parsedEndTime) {
+                            $executionData['actual_end_time'] = $parsedEndTime;
+                        }
+                    }
+                    
+                    // Performed by (by NIK or name)
+                    $performedByNik = $getValue('Performed By (NIK)');
+                    $performedByName = $getValue('Performed By (Name)');
+                    if (!empty($performedByNik)) {
+                        $user = User::where('nik', $performedByNik)->first();
+                        if ($user) {
+                            $executionData['performed_by'] = $user->id;
+                        }
+                    } elseif (!empty($performedByName)) {
+                        $user = User::where('name', $performedByName)->first();
+                        if ($user) {
+                            $executionData['performed_by'] = $user->id;
+                        }
+                    }
+                    
+                    // Measured value
+                    $measuredValue = $getValue('Measured Value');
+                    if (!empty($measuredValue) && is_numeric($measuredValue)) {
+                        $executionData['measured_value'] = $measuredValue;
+                        
+                        // Calculate measurement_status based on standard
+                        if ($schedule->standard) {
+                            $executionData['measurement_status'] = $schedule->standard->getMeasurementStatus($measuredValue);
+                        }
+                    }
+                    
+                    // Other optional fields
+                    $findings = $getValue('Findings');
+                    if (!empty($findings)) {
+                        $executionData['findings'] = $findings;
+                    }
+                    
+                    $actionsTaken = $getValue('Actions Taken');
+                    if (!empty($actionsTaken)) {
+                        $executionData['actions_taken'] = $actionsTaken;
+                    }
+                    
+                    $notes = $getValue('Notes');
+                    if (!empty($notes)) {
+                        $executionData['notes'] = $notes;
+                    }
+                    
+                    $cost = $getValue('Cost');
+                    if (!empty($cost) && is_numeric($cost)) {
+                        $executionData['cost'] = $cost;
+                    }
+                    
+                    // Create or update execution
+                    if ($execution) {
+                        $execution->update($executionData);
+                    } else {
+                        PredictiveMaintenanceExecution::create($executionData);
+                    }
+                    
+                    $rowCount++;
+                } catch (\Exception $e) {
+                    $errorCount++;
+                    $errors[] = "Row $row: " . $e->getMessage();
+                    \Log::error('Error importing predictive maintenance execution row: ' . $e->getMessage(), [
+                        'row' => $row,
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                }
+            }
+            
+            $message = "Imported $rowCount execution(s).";
+            if ($errorCount > 0) {
+                $message .= " $errorCount error(s) occurred.";
+                if (count($errors) <= 10) {
+                    $message .= " Errors: " . implode('; ', $errors);
+                } else {
+                    $message .= " First 10 errors: " . implode('; ', array_slice($errors, 0, 10));
+                }
+            }
+            
+            return redirect()->route('predictive-maintenance.controlling.index')
+                ->with('success', $message)
+                ->with('import_errors', $errors);
+        } catch (\Exception $e) {
+            \Log::error('Error uploading Excel file: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            return back()->withErrors(['excel_file' => 'Error reading Excel file: ' . $e->getMessage()]);
+        }
+    }
+    
+    /**
+     * Parse date from various formats
+     */
+    private function parseDate($dateValue)
+    {
+        if (empty($dateValue)) {
+            return null;
+        }
+        
+        // If it's already a date object
+        if ($dateValue instanceof \DateTime) {
+            return $dateValue->format('Y-m-d');
+        }
+        
+        // Try to parse as date string
+        try {
+            $date = Carbon::parse($dateValue);
+            return $date->format('Y-m-d');
+        } catch (\Exception $e) {
+            // Try Excel date format (numeric)
+            if (is_numeric($dateValue)) {
+                try {
+                    $date = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($dateValue);
+                    return $date->format('Y-m-d');
+                } catch (\Exception $e2) {
+                    return null;
+                }
+            }
+            return null;
+        }
+    }
+    
+    /**
+     * Parse datetime from various formats
+     */
+    private function parseDateTime($dateTimeValue)
+    {
+        if (empty($dateTimeValue)) {
+            return null;
+        }
+        
+        // If it's already a datetime object
+        if ($dateTimeValue instanceof \DateTime) {
+            return $dateTimeValue->format('Y-m-d H:i:s');
+        }
+        
+        // Try to parse as datetime string
+        try {
+            $dateTime = Carbon::parse($dateTimeValue);
+            return $dateTime->format('Y-m-d H:i:s');
+        } catch (\Exception $e) {
+            // Try Excel datetime format (numeric)
+            if (is_numeric($dateTimeValue)) {
+                try {
+                    $dateTime = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($dateTimeValue);
+                    return $dateTime->format('Y-m-d H:i:s');
+                } catch (\Exception $e2) {
+                    return null;
+                }
+            }
+            return null;
         }
     }
 }

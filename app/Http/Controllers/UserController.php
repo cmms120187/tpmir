@@ -134,7 +134,7 @@ class UserController extends Controller
         $user->photo = $validated['photo'] ?? null;
         $user->save();
         
-        return redirect()->route('users.index', request()->only(['filter_role', 'filter_atasan', 'page']))->with('success', 'User created successfully.');
+        return redirect()->route('users.index')->with('success', 'User berhasil dibuat!');
     }
 
     /**

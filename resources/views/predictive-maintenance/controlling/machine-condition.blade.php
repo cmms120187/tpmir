@@ -42,24 +42,28 @@
                 <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full
                     @if($overallCondition == 'normal') bg-green-100 border border-green-300
                     @elseif($overallCondition == 'warning') bg-yellow-100 border border-yellow-300
+                    @elseif($overallCondition == 'caution') bg-orange-100 border border-orange-300
                     @elseif($overallCondition == 'critical') bg-red-100 border border-red-300
                     @else bg-gray-100 border border-gray-300
                     @endif">
                     <div class="w-4 h-4 rounded-full
                         @if($overallCondition == 'normal') bg-green-500
                         @elseif($overallCondition == 'warning') bg-yellow-500
+                        @elseif($overallCondition == 'caution') bg-orange-500
                         @elseif($overallCondition == 'critical') bg-red-500
                         @else bg-gray-400
                         @endif"></div>
                     <span class="text-sm font-semibold
                         @if($overallCondition == 'normal') text-green-800
                         @elseif($overallCondition == 'warning') text-yellow-800
+                        @elseif($overallCondition == 'caution') text-orange-800
                         @elseif($overallCondition == 'critical') text-red-800
                         @else text-gray-600
                         @endif">
                         @if($overallCondition == 'normal') Aman
                         @elseif($overallCondition == 'warning') Perlu Perhatian
-                        @elseif($overallCondition == 'critical') Kritis
+                        @elseif($overallCondition == 'caution') Perlu Pengawasan
+                        @elseif($overallCondition == 'critical') Perlu Perbaikan
                         @else Belum Ada Data
                         @endif
                     </span>
@@ -83,6 +87,7 @@
                         <div class="border rounded-lg p-4 hover:shadow-md transition-shadow
                             @if($condition == 'normal') border-green-200 bg-green-50
                             @elseif($condition == 'warning') border-yellow-200 bg-yellow-50
+                            @elseif($condition == 'caution') border-orange-200 bg-orange-50
                             @elseif($condition == 'critical') border-red-200 bg-red-50
                             @else border-gray-200 bg-gray-50
                             @endif">
@@ -116,24 +121,28 @@
                                     <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full
                                         @if($condition == 'normal') bg-green-100 border border-green-300
                                         @elseif($condition == 'warning') bg-yellow-100 border border-yellow-300
+                                        @elseif($condition == 'caution') bg-orange-100 border border-orange-300
                                         @elseif($condition == 'critical') bg-red-100 border border-red-300
                                         @else bg-gray-100 border border-gray-300
                                         @endif">
                                         <div class="w-3 h-3 rounded-full
                                             @if($condition == 'normal') bg-green-500
                                             @elseif($condition == 'warning') bg-yellow-500
+                                            @elseif($condition == 'caution') bg-orange-500
                                             @elseif($condition == 'critical') bg-red-500
                                             @else bg-gray-400
                                             @endif"></div>
                                         <span class="text-xs font-semibold
                                             @if($condition == 'normal') text-green-800
                                             @elseif($condition == 'warning') text-yellow-800
+                                            @elseif($condition == 'caution') text-orange-800
                                             @elseif($condition == 'critical') text-red-800
                                             @else text-gray-600
                                             @endif">
                                             @if($condition == 'normal') Aman
                                             @elseif($condition == 'warning') Perlu Perhatian
-                                            @elseif($condition == 'critical') Kritis
+                                            @elseif($condition == 'caution') Perlu Pengawasan
+                                            @elseif($condition == 'critical') Perlu Perbaikan
                                             @else Belum Ada Data
                                             @endif
                                         </span>

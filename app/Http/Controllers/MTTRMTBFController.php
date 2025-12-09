@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Downtime;
 use App\Models\DowntimeErp;
+use App\Models\DowntimeErp2;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -12,8 +13,8 @@ class MTTRMTBFController extends Controller
 {
     public function index(Request $request)
     {
-        // Get data source from request or session, default to 'downtime'
-        $dataSource = $request->input('data_source', session('mttr_mtbf_data_source', 'downtime'));
+        // Get data source from request or session, default to 'downtime_erp2'
+        $dataSource = $request->input('data_source', session('mttr_mtbf_data_source', 'downtime_erp2'));
         session(['mttr_mtbf_data_source' => $dataSource]);
         
         // Default to current month and year
@@ -21,7 +22,30 @@ class MTTRMTBFController extends Controller
         $selectedYear = $request->input('year', now()->year);
         
         // Build base query
-        if ($dataSource === 'downtime_erp') {
+        if ($dataSource === 'downtime_erp2') {
+            $baseQuery = DowntimeErp2::query()
+                ->whereNotNull('idMachine')
+                ->where('idMachine', '!=', '')
+                ->whereYear('date', $selectedYear)
+                ->whereMonth('date', $selectedMonth);
+            
+            // Apply filters
+            if ($request->filled('plant')) {
+                $baseQuery->where('plant', $request->plant);
+            }
+            if ($request->filled('process')) {
+                $baseQuery->where('process', $request->process);
+            }
+            if ($request->filled('line')) {
+                $baseQuery->where('line', $request->line);
+            }
+            if ($request->filled('room')) {
+                $baseQuery->where('roomName', $request->room);
+            }
+            if ($request->filled('typeMachine')) {
+                $baseQuery->where('typeMachine', $request->typeMachine);
+            }
+        } elseif ($dataSource === 'downtime_erp') {
             $baseQuery = DowntimeErp::query()
                 ->whereNotNull('idMachine')
                 ->where('idMachine', '!=', '')
@@ -82,7 +106,7 @@ class MTTRMTBFController extends Controller
         
         // ========== MTTR (Mean Time To Repair) ==========
         // MTTR = Total Duration / Total Frequency
-        if ($dataSource === 'downtime_erp') {
+        if ($dataSource === 'downtime_erp2' || $dataSource === 'downtime_erp') {
             $mttrData = (clone $baseQuery)->select(
                     'idMachine',
                     DB::raw('MAX(typeMachine) as typeMachine'),
@@ -127,7 +151,7 @@ class MTTRMTBFController extends Controller
         
         // ========== MTBF (Mean Time Between Failures) ==========
         // MTBF = (Total Available Time - Total Downtime) / Number of Failures
-        if ($dataSource === 'downtime_erp') {
+        if ($dataSource === 'downtime_erp2' || $dataSource === 'downtime_erp') {
             $mtbfData = (clone $baseQuery)->select(
                     'idMachine',
                     DB::raw('MAX(typeMachine) as typeMachine'),
@@ -197,7 +221,7 @@ class MTTRMTBFController extends Controller
         $overallMTBF = $overallDowntimeCount > 0 ? $overallOperatingTime / $overallDowntimeCount : 0;
         
         // Top 10 MTTR (Highest)
-        if ($dataSource === 'downtime_erp') {
+        if ($dataSource === 'downtime_erp2' || $dataSource === 'downtime_erp') {
             $top10MTTR = (clone $baseQuery)->select(
                     'idMachine',
                     DB::raw('MAX(typeMachine) as typeMachine'),
@@ -245,12 +269,13 @@ class MTTRMTBFController extends Controller
                 ->values();
             
             // Get unique values for filters
-            $plants = DowntimeErp::whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth)->distinct()->whereNotNull('plant')->where('plant', '!=', '')->orderBy('plant')->pluck('plant')->unique();
-            $processes = DowntimeErp::whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth)->distinct()->whereNotNull('process')->where('process', '!=', '')->orderBy('process')->pluck('process')->unique();
-            $lines = DowntimeErp::whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth)->distinct()->whereNotNull('line')->where('line', '!=', '')->orderBy('line')->pluck('line')->unique();
-            $rooms = DowntimeErp::whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth)->distinct()->whereNotNull('roomName')->where('roomName', '!=', '')->orderBy('roomName')->pluck('roomName')->unique();
-            $typeMachines = DowntimeErp::whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth)->distinct()->whereNotNull('typeMachine')->where('typeMachine', '!=', '')->orderBy('typeMachine')->pluck('typeMachine')->unique();
-            $machines = DowntimeErp::whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth)->distinct()->whereNotNull('idMachine')->where('idMachine', '!=', '')->orderBy('idMachine')->pluck('idMachine')->unique();
+            $filterModel = ($dataSource === 'downtime_erp2') ? DowntimeErp2::class : DowntimeErp::class;
+            $plants = $filterModel::whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth)->distinct()->whereNotNull('plant')->where('plant', '!=', '')->orderBy('plant')->pluck('plant')->unique();
+            $processes = $filterModel::whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth)->distinct()->whereNotNull('process')->where('process', '!=', '')->orderBy('process')->pluck('process')->unique();
+            $lines = $filterModel::whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth)->distinct()->whereNotNull('line')->where('line', '!=', '')->orderBy('line')->pluck('line')->unique();
+            $rooms = $filterModel::whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth)->distinct()->whereNotNull('roomName')->where('roomName', '!=', '')->orderBy('roomName')->pluck('roomName')->unique();
+            $typeMachines = $filterModel::whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth)->distinct()->whereNotNull('typeMachine')->where('typeMachine', '!=', '')->orderBy('typeMachine')->pluck('typeMachine')->unique();
+            $machines = $filterModel::whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth)->distinct()->whereNotNull('idMachine')->where('idMachine', '!=', '')->orderBy('idMachine')->pluck('idMachine')->unique();
         } else {
             $top10MTTR = (clone $baseQuery)->select(
                     DB::raw('machines.idMachine as idMachine'),

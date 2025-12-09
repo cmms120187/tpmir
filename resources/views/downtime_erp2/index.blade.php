@@ -3,8 +3,9 @@
 <div class="w-full p-4 sm:p-6 lg:p-8">
     <div class="w-full mx-auto">
         <div class="flex items-center justify-between mb-6">
-            <h1 class="text-2xl font-bold text-gray-800">Downtime ERP2</h1>
+            <h1 class="text-2xl font-bold text-gray-800">Downtime</h1>
             <div class="flex items-center gap-3">
+                @if(auth()->user()->role === 'admin')
                 <a href="{{ route('downtime-erp2.download') }}" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded shadow transition flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -17,6 +18,7 @@
                     </svg>
                     Upload Excel
                 </button>
+                @endif
                 <a href="{{ route('downtime-erp2.create') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow transition flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                     Create
@@ -100,7 +102,8 @@
     </div>
 </div>
 
-<!-- Upload Modal -->
+<!-- Upload Modal - Admin Only -->
+@if(auth()->user()->role === 'admin')
 <div id="uploadModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
     <div class="flex items-center justify-center min-h-screen px-4">
         <div class="fixed inset-0 bg-black bg-opacity-50" onclick="document.getElementById('uploadModal').classList.add('hidden')"></div>
@@ -128,5 +131,6 @@
         </div>
     </div>
 </div>
+@endif
 @endsection
 

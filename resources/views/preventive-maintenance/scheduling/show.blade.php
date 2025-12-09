@@ -24,8 +24,8 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-500 mb-1">Machine</label>
-                        <p class="text-sm font-semibold text-gray-900">{{ $schedule->machine->idMachine ?? '-' }} - {{ $schedule->machine->machineType->name ?? '-' }}</p>
-                        <p class="text-xs text-gray-500">{{ $schedule->machine->plant->name ?? '-' }} / {{ $schedule->machine->process->name ?? '-' }} / {{ $schedule->machine->line->name ?? '-' }}</p>
+                        <p class="text-sm font-semibold text-gray-900">{{ $schedule->machineErp->idMachine ?? '-' }} - {{ $schedule->machineErp->machineType->name ?? $schedule->machineErp->type_name ?? '-' }}</p>
+                        <p class="text-xs text-gray-500">{{ $schedule->machineErp->plant_name ?? '-' }} / {{ $schedule->machineErp->process_name ?? '-' }} / {{ $schedule->machineErp->line_name ?? '-' }}</p>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-500 mb-1">Maintenance Point</label>

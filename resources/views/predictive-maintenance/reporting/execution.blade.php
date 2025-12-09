@@ -114,11 +114,11 @@
                             @foreach($executions as $execution)
                             <tr class="hover:bg-gray-50">
                                 <td class="px-4 py-3 text-sm">
-                                    <div class="font-semibold text-gray-900">{{ $execution->schedule->machine->idMachine ?? '-' }}</div>
-                                    <div class="text-gray-500">{{ $execution->schedule->machine->machineType->name ?? '-' }}</div>
+                                    <div class="font-semibold text-gray-900">{{ $execution->schedule->machineErp->idMachine ?? '-' }}</div>
+                                    <div class="text-gray-500">{{ $execution->schedule->machineErp->machineType->name ?? '-' }}</div>
                                     <div class="text-xs text-gray-400">
-                                        {{ $execution->schedule->machine->room->plant->name ?? '-' }} /
-                                        {{ $execution->schedule->machine->room->line->name ?? '-' }}
+                                        {{ $execution->schedule->machineErp->plant_name ?? '-' }} /
+                                        {{ $execution->schedule->machineErp->line_name ?? '-' }}
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-500">
@@ -133,7 +133,7 @@
                                 </td>
                                 <td class="px-4 py-3 text-sm">
                                     @if($execution->measured_value !== null)
-                                        <span class="font-semibold">{{ $execution->measured_value }}</span>
+                                        <span class="font-semibold">{{ number_format((float)$execution->measured_value, 2, '.', '') }}</span>
                                         <span class="text-gray-500">{{ $execution->schedule->standard->unit ?? '' }}</span>
                                         @if($execution->measurement_status)
                                             <span class="ml-2 px-2 py-0.5 rounded text-xs

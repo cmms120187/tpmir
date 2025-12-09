@@ -79,10 +79,17 @@
             <!-- Photo Section -->
             @if($machineType->photo)
                 @php
-                    $photoUrl = asset('storage/' . $machineType->photo);
-                    $photoExists = \Illuminate\Support\Facades\Storage::disk('public')->exists($machineType->photo);
+                    // Check for .webp version first
+                    $photoPath = $machineType->photo;
+                    $webpPath = preg_replace('/\.(jpg|jpeg|png|gif)$/i', '.webp', $photoPath);
+                    $photoExists = \Illuminate\Support\Facades\Storage::disk('public')->exists($photoPath);
+                    $webpExists = \Illuminate\Support\Facades\Storage::disk('public')->exists($webpPath);
+                    
+                    // Use webp if exists, otherwise use original
+                    $actualPath = $webpExists ? $webpPath : $photoPath;
+                    $photoUrl = asset('public-storage/' . $actualPath);
                 @endphp
-                @if($photoExists)
+                @if($photoExists || $webpExists)
                     <div class="mt-6 pt-6 border-t border-gray-200">
                         <label class="block text-sm font-medium text-gray-500 mb-3">Photo</label>
                         <div class="bg-gray-50 rounded-lg p-4 border border-gray-200 inline-block">
@@ -126,8 +133,11 @@
                                 <div class="bg-white rounded p-3 border border-gray-200">
                                     <div class="flex items-start gap-3">
                                         @if($point->photo)
+                                            @php
+                                                $photoUrl = asset('public-storage/' . $point->photo);
+                                            @endphp
                                             <div class="flex-shrink-0">
-                                                <img src="{{ Storage::url($point->photo) }}" alt="Photo" class="w-12 h-20 object-cover rounded border cursor-pointer" onclick="openPhotoModal('{{ Storage::url($point->photo) }}')">
+                                                <img src="{{ $photoUrl }}" alt="Photo" class="w-12 h-20 object-cover rounded border cursor-pointer" onclick="openPhotoModal('{{ $photoUrl }}')" onerror="this.style.display='none';">
                                             </div>
                                         @endif
                                         <div class="flex-1 min-w-0">

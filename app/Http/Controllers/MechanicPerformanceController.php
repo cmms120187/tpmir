@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Downtime;
 use App\Models\DowntimeErp;
+use App\Models\DowntimeErp2;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -12,8 +13,8 @@ class MechanicPerformanceController extends Controller
 {
     public function index(Request $request)
     {
-        // Get data source from request or session, default to 'downtime'
-        $dataSource = $request->input('data_source', session('mechanic_performance_data_source', 'downtime'));
+        // Get data source from request or session, default to 'downtime_erp2'
+        $dataSource = $request->input('data_source', session('mechanic_performance_data_source', 'downtime_erp2'));
         session(['mechanic_performance_data_source' => $dataSource]);
         
         // Default to "all" (no filter)
@@ -21,7 +22,51 @@ class MechanicPerformanceController extends Controller
         $selectedYear = $request->input('year', 'all');
         
         // Build base query
-        if ($dataSource === 'downtime_erp') {
+        if ($dataSource === 'downtime_erp2' || $dataSource === 'downtime_erp') {
+            $erpModel = ($dataSource === 'downtime_erp2') ? DowntimeErp2::class : DowntimeErp::class;
+            
+            if ($dataSource === 'downtime_erp2') {
+                $baseQuery = DowntimeErp2::query()
+                    ->whereNotNull('nameMekanik')
+                    ->where('nameMekanik', '!=', '');
+            } else {
+                $baseQuery = DowntimeErp::query()
+                    ->whereNotNull('nameMekanik')
+                    ->where('nameMekanik', '!=', '');
+            }
+            
+            // Apply month filter if not "all"
+            if ($selectedMonth !== 'all' && is_numeric($selectedMonth)) {
+                $baseQuery->whereMonth('date', $selectedMonth);
+            }
+            
+            // Apply year filter if not "all"
+            if ($selectedYear !== 'all' && is_numeric($selectedYear)) {
+                $baseQuery->whereYear('date', $selectedYear);
+            }
+            
+            // If both are "all", limit to last 2 years for performance
+            if ($selectedMonth === 'all' && $selectedYear === 'all') {
+                $baseQuery->where('date', '>=', Carbon::now()->subYears(2)->startOfYear());
+            }
+            
+            // Apply filters
+            if ($request->filled('plant')) {
+                $baseQuery->where('plant', $request->plant);
+            }
+            if ($request->filled('process')) {
+                $baseQuery->where('process', $request->process);
+            }
+            if ($request->filled('line')) {
+                $baseQuery->where('line', $request->line);
+            }
+            if ($request->filled('room')) {
+                $baseQuery->where('roomName', $request->room);
+            }
+            if ($request->filled('typeMachine')) {
+                $baseQuery->where('typeMachine', $request->typeMachine);
+            }
+        } elseif ($dataSource === 'downtime_erp') {
             $baseQuery = DowntimeErp::query()
                 ->whereNotNull('nameMekanik')
                 ->where('nameMekanik', '!=', '');
@@ -117,7 +162,7 @@ class MechanicPerformanceController extends Controller
         }
         
         // ========== MECHANIC PERFORMANCE STATISTICS ==========
-        if ($dataSource === 'downtime_erp') {
+        if ($dataSource === 'downtime_erp2' || $dataSource === 'downtime_erp') {
             $mechanicStats = (clone $baseQuery)
                 ->select(
                     'idMekanik',
@@ -236,7 +281,7 @@ class MechanicPerformanceController extends Controller
         })->groupBy('idMekanik');
         
         // ========== TOP MECHANICS ==========
-        if ($dataSource === 'downtime_erp') {
+        if ($dataSource === 'downtime_erp2' || $dataSource === 'downtime_erp') {
             $topMechanics = (clone $baseQuery)
                 ->select(
                     'idMekanik',
@@ -251,7 +296,8 @@ class MechanicPerformanceController extends Controller
                 ->get();
             
             // Get unique values for filters
-            $filterQuery = DowntimeErp::query();
+            $filterModel = ($dataSource === 'downtime_erp2') ? DowntimeErp2::class : DowntimeErp::class;
+            $filterQuery = $filterModel::query();
             if ($selectedMonth !== 'all' && is_numeric($selectedMonth)) {
                 $filterQuery->whereMonth('date', $selectedMonth);
             }

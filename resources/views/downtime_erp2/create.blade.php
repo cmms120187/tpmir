@@ -16,58 +16,6 @@
         <form action="{{ route('downtime-erp2.store') }}" method="POST">
             @csrf
             
-            <!-- Basic Information -->
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">Basic Information</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label for="date" class="block text-sm font-semibold text-gray-700 mb-2">Date <span class="text-red-500">*</span></label>
-                        <input type="date" name="date" id="date" value="{{ old('date', date('Y-m-d')) }}" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('date') border-red-500 @enderror">
-                        @error('date')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
-                    </div>
-                    <div>
-                        <label for="plant" class="block text-sm font-semibold text-gray-700 mb-2">Plant <span class="text-red-500">*</span> (Auto-fill)</label>
-                        <input type="text" name="plant" id="plant" value="{{ old('plant') }}" required readonly class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('plant') border-red-500 @enderror">
-                        <p class="text-xs text-gray-500 mt-1">Otomatis terisi dari Machine ERP</p>
-                        @error('plant')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
-                    </div>
-                    <div>
-                        <label for="process" class="block text-sm font-semibold text-gray-700 mb-2">Process <span class="text-red-500">*</span> (Auto-fill)</label>
-                        <input type="text" name="process" id="process" value="{{ old('process') }}" required readonly class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('process') border-red-500 @enderror">
-                        <p class="text-xs text-gray-500 mt-1">Otomatis terisi dari Machine ERP</p>
-                        @error('process')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
-                    </div>
-                    <div>
-                        <label for="line" class="block text-sm font-semibold text-gray-700 mb-2">Line <span class="text-red-500">*</span> (Auto-fill)</label>
-                        <input type="text" name="line" id="line" value="{{ old('line') }}" required readonly class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('line') border-red-500 @enderror">
-                        <p class="text-xs text-gray-500 mt-1">Otomatis terisi dari Machine ERP</p>
-                        @error('line')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
-                    </div>
-                    <div>
-                        <label for="roomName" class="block text-sm font-semibold text-gray-700 mb-2">Room Name <span class="text-red-500">*</span> (Auto-fill)</label>
-                        <input type="text" name="roomName" id="roomName" value="{{ old('roomName') }}" required readonly class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('roomName') border-red-500 @enderror">
-                        <p class="text-xs text-gray-500 mt-1">Otomatis terisi dari Machine ERP</p>
-                        @error('roomName')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
-                    </div>
-                </div>
-                
-                <!-- Hidden field for kode_room -->
-                <input type="hidden" name="kode_room" id="kode_room" value="{{ old('kode_room') }}">
-                <div class="mt-4">
-                    <label class="flex items-center">
-                        <input type="checkbox" 
-                               name="include_oee" 
-                               id="include_oee" 
-                               value="1"
-                               {{ old('include_oee') ? 'checked' : '' }}
-                               class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2">
-                        <span class="ml-2 text-sm font-semibold text-gray-700">Include OEE</span>
-                    </label>
-                    <p class="text-xs text-gray-500 mt-1 ml-6">Centang untuk memasukkan data ini ke perhitungan OEE</p>
-                    @error('include_oee')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
-                </div>
-            </div>
-
             <!-- Machine Information -->
             <div class="mb-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">Machine Information</h3>
@@ -124,6 +72,58 @@
                 </div>
             </div>
 
+            <!-- Basic Information -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">Basic Information</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="date" class="block text-sm font-semibold text-gray-700 mb-2">Date <span class="text-red-500">*</span></label>
+                        <input type="date" name="date" id="date" value="{{ old('date', date('Y-m-d')) }}" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('date') border-red-500 @enderror">
+                        @error('date')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="plant" class="block text-sm font-semibold text-gray-700 mb-2">Plant <span class="text-red-500">*</span> (Auto-fill)</label>
+                        <input type="text" name="plant" id="plant" value="{{ old('plant') }}" required readonly class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('plant') border-red-500 @enderror">
+                        <p class="text-xs text-gray-500 mt-1">Otomatis terisi dari Machine ERP</p>
+                        @error('plant')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="process" class="block text-sm font-semibold text-gray-700 mb-2">Process <span class="text-red-500">*</span> (Auto-fill)</label>
+                        <input type="text" name="process" id="process" value="{{ old('process') }}" required readonly class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('process') border-red-500 @enderror">
+                        <p class="text-xs text-gray-500 mt-1">Otomatis terisi dari Machine ERP</p>
+                        @error('process')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="line" class="block text-sm font-semibold text-gray-700 mb-2">Line <span class="text-red-500">*</span> (Auto-fill)</label>
+                        <input type="text" name="line" id="line" value="{{ old('line') }}" required readonly class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('line') border-red-500 @enderror">
+                        <p class="text-xs text-gray-500 mt-1">Otomatis terisi dari Machine ERP</p>
+                        @error('line')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="roomName" class="block text-sm font-semibold text-gray-700 mb-2">Room Name <span class="text-red-500">*</span> (Auto-fill)</label>
+                        <input type="text" name="roomName" id="roomName" value="{{ old('roomName') }}" required readonly class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('roomName') border-red-500 @enderror">
+                        <p class="text-xs text-gray-500 mt-1">Otomatis terisi dari Machine ERP</p>
+                        @error('roomName')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+                </div>
+                
+                <!-- Hidden field for kode_room -->
+                <input type="hidden" name="kode_room" id="kode_room" value="{{ old('kode_room') }}">
+                <div class="mt-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" 
+                               name="include_oee" 
+                               id="include_oee" 
+                               value="1"
+                               {{ old('include_oee') ? 'checked' : '' }}
+                               class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2">
+                        <span class="ml-2 text-sm font-semibold text-gray-700">Include OEE</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1 ml-6">Centang untuk memasukkan data ini ke perhitungan OEE</p>
+                    @error('include_oee')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                </div>
+            </div>
+
             <!-- Downtime Information -->
             <div class="mb-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">Downtime Information</h3>
@@ -162,36 +162,79 @@
 
             <!-- Problem Information -->
             <div class="mb-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">Problem Information</h3>
+                <div class="flex items-center justify-between mb-4 border-b pb-2">
+                    <h3 class="text-lg font-semibold text-gray-800">Problem Information</h3>
+                    <div class="flex items-center gap-2">
+                        <label for="problem_search" class="text-sm font-medium text-gray-700">Cari:</label>
+                        <div class="relative" style="width: 300px;">
+                            <input type="text" 
+                                   id="problem_search" 
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" 
+                                   placeholder="Ketik untuk filter atau cari Action..."
+                                   autocomplete="off">
+                            <div id="action_suggestions" class="hidden absolute z-50 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg w-full max-h-60 overflow-y-auto"></div>
+                        </div>
+                    </div>
+                </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Hidden field for problemDowntime (auto-filled from problem) -->
+                    <input type="hidden" name="problemDowntime" id="problemDowntime" value="{{ old('problemDowntime') }}" required>
+                    
                     <div>
-                        <label for="problemDowntime" class="block text-sm font-semibold text-gray-700 mb-2">Problem Downtime <span class="text-red-500">*</span></label>
-                        <input type="text" name="problemDowntime" id="problemDowntime" value="{{ old('problemDowntime') }}" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('problemDowntime') border-red-500 @enderror">
-                        @error('problemDowntime')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                        <label for="system_select" class="block text-sm font-semibold text-gray-700 mb-2">System <span class="text-red-500">*</span></label>
+                        <select name="system_select" id="system_select" required disabled class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('system_select') border-red-500 @enderror">
+                            <option value="">-- Pilih Machine terlebih dahulu --</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Otomatis terfilter berdasarkan machine yang dipilih</p>
+                        @error('system_select')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="problem_select" class="block text-sm font-semibold text-gray-700 mb-2">Problem <span class="text-red-500">*</span></label>
+                        <select name="problem_select" id="problem_select" required disabled class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('problem_select') border-red-500 @enderror">
+                            <option value="">-- Pilih System terlebih dahulu --</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Pilih problem setelah memilih system (akan mengisi Problem Downtime)</p>
+                        @error('problem_select')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label for="Problem_MM" class="block text-sm font-semibold text-gray-700 mb-2">Problem MM</label>
-                        <input type="text" name="Problem_MM" id="Problem_MM" value="{{ old('Problem_MM') }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('Problem_MM') border-red-500 @enderror">
+                        <input type="text" name="Problem_MM" id="Problem_MM" value="{{ old('Problem_MM', 'other') }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('Problem_MM') border-red-500 @enderror">
+                        <p class="text-xs text-gray-500 mt-1">Default: "other" (dapat diedit)</p>
                         @error('Problem_MM')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
                     </div>
                     <div>
-                        <label for="reasonDowntime" class="block text-sm font-semibold text-gray-700 mb-2">Reason Downtime <span class="text-red-500">*</span></label>
-                        <input type="text" name="reasonDowntime" id="reasonDowntime" value="{{ old('reasonDowntime') }}" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('reasonDowntime') border-red-500 @enderror">
-                        @error('reasonDowntime')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                        <label for="reason_select" class="block text-sm font-semibold text-gray-700 mb-2">Reason Downtime <span class="text-red-500">*</span></label>
+                        <select name="reason_select" id="reason_select" required disabled class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('reason_select') border-red-500 @enderror">
+                            <option value="">-- Pilih Problem terlebih dahulu --</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Pilih reason setelah memilih problem</p>
+                        @error('reason_select')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                        <!-- Hidden field for reasonDowntime (auto-filled from reason) -->
+                        <input type="hidden" name="reasonDowntime" id="reasonDowntime" value="{{ old('reasonDowntime') }}" required>
                     </div>
                     <div>
-                        <label for="actionDowtime" class="block text-sm font-semibold text-gray-700 mb-2">Action Downtime <span class="text-red-500">*</span></label>
-                        <input type="text" name="actionDowtime" id="actionDowtime" value="{{ old('actionDowtime') }}" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('actionDowtime') border-red-500 @enderror">
-                        @error('actionDowtime')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                        <label for="action_select" class="block text-sm font-semibold text-gray-700 mb-2">Action Downtime <span class="text-red-500">*</span></label>
+                        <select name="action_select" id="action_select" required disabled class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('action_select') border-red-500 @enderror">
+                            <option value="">-- Pilih Reason terlebih dahulu --</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Pilih action setelah memilih reason</p>
+                        @error('action_select')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                        <!-- Hidden field for actionDowtime (auto-filled from action) -->
+                        <input type="hidden" name="actionDowtime" id="actionDowtime" value="{{ old('actionDowtime') }}" required>
                     </div>
                     <div>
-                        <label for="Part" class="block text-sm font-semibold text-gray-700 mb-2">Part</label>
-                        <input type="text" name="Part" id="Part" value="{{ old('Part') }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('Part') border-red-500 @enderror">
-                        @error('Part')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                        <label for="part_select" class="block text-sm font-semibold text-gray-700 mb-2">Part</label>
+                        <select name="part_select" id="part_select" disabled class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('part_select') border-red-500 @enderror">
+                            <option value="">-- Pilih System terlebih dahulu --</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Pilih part setelah memilih system (terfilter berdasarkan system)</p>
+                        @error('part_select')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                        <!-- Hidden field for Part (auto-filled from part_select) -->
+                        <input type="hidden" name="Part" id="Part" value="{{ old('Part') }}">
                     </div>
                     <div>
-                        <label for="groupProblem" class="block text-sm font-semibold text-gray-700 mb-2">Group Problem <span class="text-red-500">*</span></label>
-                        <input type="text" name="groupProblem" id="groupProblem" value="{{ old('groupProblem') }}" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('groupProblem') border-red-500 @enderror">
+                        <label for="groupProblem" class="block text-sm font-semibold text-gray-700 mb-2">Group Problem</label>
+                        <input type="text" name="groupProblem" id="groupProblem" value="{{ old('groupProblem') }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('groupProblem') border-red-500 @enderror">
                         @error('groupProblem')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
                     </div>
                 </div>
@@ -321,6 +364,13 @@ const mekaniks = @json($mekaniks);
 // Machine data from server (already mapped in controller)
 const machines = @json($machines);
 
+// System, Problem, Reason, Action, and Part data from server (already mapped in controller)
+const systems = @json($systems ?? []);
+const problems = @json($problems ?? []);
+const reasons = @json($reasons ?? []);
+const actions = @json($actions ?? []);
+const parts = @json($parts ?? []);
+
 // DOM elements - Mekanik
 const mekanikSearch = document.getElementById('mekanik_search');
 const mekanikId = document.getElementById('idMekanik');
@@ -336,18 +386,9 @@ const nameGL = document.getElementById('nameGL');
 const idCoord = document.getElementById('idCoord');
 const nameCoord = document.getElementById('nameCoord');
 
-// DOM elements - Machine
-const machineSearch = document.getElementById('machine_search');
-const machineIdInput = document.getElementById('idMachine');
-const machineDropdown = document.getElementById('machine_dropdown');
-const selectedMachine = document.getElementById('selected_machine');
-const selectedMachineInfo = document.getElementById('selected_machine_info');
-const clearMachine = document.getElementById('clear_machine');
-const scanBarcodeBtn = document.getElementById('scan_barcode_btn');
-const barcodeModal = document.getElementById('barcode_modal');
-const barcodeVideo = document.getElementById('barcode_video');
-const barcodeCanvas = document.getElementById('barcode_canvas');
-const manualBarcodeInput = document.getElementById('manual_barcode_input');
+// DOM elements - Machine (will be initialized after DOM ready)
+let machineSearch, machineIdInput, machineDropdown, selectedMachine, selectedMachineInfo, clearMachine;
+let scanBarcodeBtn, barcodeModal, barcodeVideo, barcodeCanvas, manualBarcodeInput;
 
 // Machine detail fields
 const typeMachine = document.getElementById('typeMachine');
@@ -357,9 +398,6 @@ const plant = document.getElementById('plant');
 const process = document.getElementById('process');
 const line = document.getElementById('line');
 const roomName = document.getElementById('roomName');
-
-let stream = null;
-let scanning = false;
 
 // Auto-complete for mekanik
 mekanikSearch.addEventListener('input', function() {
@@ -542,140 +580,337 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Machine auto-complete functionality
-machineSearch.addEventListener('input', function() {
-    const searchTerm = this.value.toLowerCase().trim();
+// Initialize machine DOM elements and event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Get machine DOM elements
+    machineSearch = document.getElementById('machine_search');
+    machineIdInput = document.getElementById('idMachine');
+    machineDropdown = document.getElementById('machine_dropdown');
+    selectedMachine = document.getElementById('selected_machine');
+    selectedMachineInfo = document.getElementById('selected_machine_info');
+    clearMachine = document.getElementById('clear_machine');
+    scanBarcodeBtn = document.getElementById('scan_barcode_btn');
+    barcodeModal = document.getElementById('barcode_modal');
+    barcodeVideo = document.getElementById('barcode_video');
+    barcodeCanvas = document.getElementById('barcode_canvas');
+    manualBarcodeInput = document.getElementById('manual_barcode_input');
     
-    if (searchTerm.length === 0) {
-        machineDropdown.classList.add('hidden');
-        return;
-    }
-    
-    const filtered = machines.filter(m => 
-        (m.idMachine && m.idMachine.toLowerCase().includes(searchTerm)) ||
-        (m.typeMachine && m.typeMachine.toLowerCase().includes(searchTerm)) ||
-        (m.modelMachine && m.modelMachine.toLowerCase().includes(searchTerm)) ||
-        (m.brandMachine && m.brandMachine.toLowerCase().includes(searchTerm))
-    );
-    
-    if (filtered.length === 0) {
-        machineDropdown.innerHTML = '<div class="px-4 py-2 text-sm text-gray-500">Tidak ada mesin ditemukan</div>';
-        machineDropdown.classList.remove('hidden');
-        return;
-    }
-    
-    machineDropdown.innerHTML = filtered.slice(0, 8).map(m => {
-        return `
-            <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors active:bg-blue-100" 
-                 data-machine-id="${String(m.id)}"
-                 data-machine-idmachine="${(m.idMachine || '').replace(/"/g, '&quot;')}"
-                 data-machine-type="${(m.typeMachine || '').replace(/"/g, '&quot;')}"
-                 data-machine-model="${(m.modelMachine || '').replace(/"/g, '&quot;')}"
-                 data-machine-brand="${(m.brandMachine || '').replace(/"/g, '&quot;')}"
-                 data-machine-plant="${(m.plant || '').replace(/"/g, '&quot;')}"
-                 data-machine-process="${(m.process || '').replace(/"/g, '&quot;')}"
-                 data-machine-line="${(m.line || '').replace(/"/g, '&quot;')}"
-                 data-machine-room="${(m.roomName || '').replace(/"/g, '&quot;')}"
-                 data-machine-kode-room="${(m.kodeRoom || '').replace(/"/g, '&quot;')}"
-                 style="user-select: none; -webkit-user-select: none;">
-                <div class="font-semibold text-gray-900">${m.idMachine || ''}</div>
-                <div class="text-xs text-gray-600">${m.typeMachine || ''} - ${m.brandMachine || ''} ${m.modelMachine || ''}</div>
-                <div class="text-xs text-gray-500">${m.plant || ''} / ${m.process || ''} / ${m.line || ''} / ${m.roomName || ''}</div>
-            </div>
-        `;
-    }).join('');
-    
-    // Add click event listeners
-    machineDropdown.querySelectorAll('[data-machine-id]').forEach(item => {
-        item.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const machineId = this.getAttribute('data-machine-id');
-            const machineIdMachine = this.getAttribute('data-machine-idmachine');
-            const machineType = this.getAttribute('data-machine-type');
-            const machineModel = this.getAttribute('data-machine-model');
-            const machineBrand = this.getAttribute('data-machine-brand');
-            const machinePlant = this.getAttribute('data-machine-plant');
-            const machineProcess = this.getAttribute('data-machine-process');
-            const machineLine = this.getAttribute('data-machine-line');
-            const machineRoom = this.getAttribute('data-machine-room');
-            const machineKodeRoom = this.getAttribute('data-machine-kode-room');
-            selectMachine(machineId, machineIdMachine, machineType, machineModel, machineBrand, machinePlant, machineProcess, machineLine, machineRoom, machineKodeRoom);
+    // Machine auto-complete functionality
+    if (machineSearch && machineDropdown) {
+        console.log('Machine search elements found, attaching event listener');
+        console.log('Machines data available:', machines ? machines.length : 0);
+        console.log('Machines data sample:', machines && machines.length > 0 ? machines[0] : 'No machines');
+        
+        machineSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase().trim();
+            console.log('Search term:', searchTerm);
+            console.log('Machine dropdown element:', machineDropdown);
+            
+            if (searchTerm.length === 0) {
+                machineDropdown.classList.add('hidden');
+                return;
+            }
+            
+            // Check if machines data is available
+            if (!machines || machines.length === 0) {
+                console.warn('Machines data is not available');
+                machineDropdown.innerHTML = '<div class="px-4 py-2 text-sm text-gray-500">Data mesin tidak tersedia</div>';
+                machineDropdown.classList.remove('hidden');
+                return;
+            }
+            
+            const filtered = machines.filter(m => 
+                (m.idMachine && m.idMachine.toLowerCase().includes(searchTerm)) ||
+                (m.typeMachine && m.typeMachine.toLowerCase().includes(searchTerm)) ||
+                (m.modelMachine && m.modelMachine.toLowerCase().includes(searchTerm)) ||
+                (m.brandMachine && m.brandMachine.toLowerCase().includes(searchTerm))
+            );
+            
+            if (filtered.length === 0) {
+                machineDropdown.innerHTML = '<div class="px-4 py-2 text-sm text-gray-500">Tidak ada mesin ditemukan</div>';
+                machineDropdown.classList.remove('hidden');
+                console.log('No machines found for search term:', searchTerm);
+                return;
+            }
+            
+            console.log('Filtered machines:', filtered.length);
+            machineDropdown.innerHTML = filtered.slice(0, 8).map(m => {
+                return `
+                    <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors active:bg-blue-100" 
+                         data-machine-id="${String(m.id)}"
+                         data-machine-idmachine="${(m.idMachine || '').replace(/"/g, '&quot;')}"
+                         data-machine-type="${(m.typeMachine || '').replace(/"/g, '&quot;')}"
+                         data-machine-model="${(m.modelMachine || '').replace(/"/g, '&quot;')}"
+                         data-machine-brand="${(m.brandMachine || '').replace(/"/g, '&quot;')}"
+                         data-machine-plant="${(m.plant || '').replace(/"/g, '&quot;')}"
+                         data-machine-process="${(m.process || '').replace(/"/g, '&quot;')}"
+                         data-machine-line="${(m.line || '').replace(/"/g, '&quot;')}"
+                         data-machine-room="${(m.roomName || '').replace(/"/g, '&quot;')}"
+                         data-machine-kode-room="${(m.kodeRoom || '').replace(/"/g, '&quot;')}"
+                         style="user-select: none; -webkit-user-select: none;">
+                        <div class="font-semibold text-gray-900">${m.idMachine || ''}</div>
+                        <div class="text-xs text-gray-600">${m.typeMachine || ''} - ${m.brandMachine || ''} ${m.modelMachine || ''}</div>
+                        <div class="text-xs text-gray-500">${m.plant || ''} / ${m.process || ''} / ${m.line || ''} / ${m.roomName || ''}</div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Add click event listeners
+            machineDropdown.querySelectorAll('[data-machine-id]').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const machineId = this.getAttribute('data-machine-id');
+                    const machineIdMachine = this.getAttribute('data-machine-idmachine');
+                    const machineType = this.getAttribute('data-machine-type');
+                    const machineModel = this.getAttribute('data-machine-model');
+                    const machineBrand = this.getAttribute('data-machine-brand');
+                    const machinePlant = this.getAttribute('data-machine-plant');
+                    const machineProcess = this.getAttribute('data-machine-process');
+                    const machineLine = this.getAttribute('data-machine-line');
+                    const machineRoom = this.getAttribute('data-machine-room');
+                    const machineKodeRoom = this.getAttribute('data-machine-kode-room');
+                    // Get system_ids from the machine data
+                    const selectedMachineData = machines.find(m => String(m.id) === machineId || m.idMachine === machineIdMachine);
+                    const systemIds = selectedMachineData ? (selectedMachineData.system_ids || []) : [];
+                    selectMachine(machineId, machineIdMachine, machineType, machineModel, machineBrand, machinePlant, machineProcess, machineLine, machineRoom, machineKodeRoom, systemIds);
+                });
+            });
+            
+            machineDropdown.classList.remove('hidden');
+            console.log('Dropdown shown with', filtered.slice(0, 8).length, 'items');
+            console.log('Dropdown classes:', machineDropdown.className);
+            console.log('Dropdown style:', machineDropdown.style.cssText);
         });
+        console.log('Event listener attached successfully');
+    } else {
+        console.error('Machine search elements not found:', { 
+            machineSearch: !!machineSearch, 
+            machineDropdown: !!machineDropdown,
+            machineSearchId: machineSearch ? machineSearch.id : 'N/A',
+            machineDropdownId: machineDropdown ? machineDropdown.id : 'N/A'
+        });
+    }
+    
+    // Select machine function
+    window.selectMachine = function(id, idMachine, type, model, brand, plantVal, processVal, lineVal, roomVal, kodeRoomVal, systemIds = []) {
+        if (!machineIdInput || !machineSearch || !selectedMachineInfo || !selectedMachine) return;
+        
+        machineIdInput.value = idMachine || '';
+        machineSearch.value = idMachine || '';
+        selectedMachineInfo.innerHTML = `
+            <div class="font-semibold">${idMachine || ''}</div>
+            <div class="text-xs text-gray-600">${type || ''} - ${brand || ''} ${model || ''}</div>
+            <div class="text-xs text-gray-500">${plantVal || ''} / ${processVal || ''} / ${lineVal || ''} / ${roomVal || ''}</div>
+        `;
+        selectedMachine.classList.remove('hidden');
+        if (machineDropdown) machineDropdown.classList.add('hidden');
+        machineSearch.blur();
+        
+        // Auto-fill machine details
+        const typeMachine = document.getElementById('typeMachine');
+        const modelMachine = document.getElementById('modelMachine');
+        const brandMachine = document.getElementById('brandMachine');
+        const plant = document.getElementById('plant');
+        const process = document.getElementById('process');
+        const line = document.getElementById('line');
+        const roomName = document.getElementById('roomName');
+        
+        if (typeMachine) typeMachine.value = type || '';
+        if (modelMachine) modelMachine.value = model || '';
+        if (brandMachine) brandMachine.value = brand || '';
+        if (plant) plant.value = plantVal || '';
+        if (process) process.value = processVal || '';
+        if (line) line.value = lineVal || '';
+        if (roomName) roomName.value = roomVal || '';
+        
+        // Set kode_room if hidden field exists
+        const kodeRoomInput = document.getElementById('kode_room');
+        if (kodeRoomInput) {
+            kodeRoomInput.value = kodeRoomVal || '';
+        }
+        
+        // Filter and populate system dropdown based on selected machine's system_ids
+        const systemSelect = document.getElementById('system_select');
+        if (systemSelect) {
+            // Clear existing options
+            systemSelect.innerHTML = '<option value="">-- Pilih System --</option>';
+            
+            if (systemIds && systemIds.length > 0) {
+                // Filter systems based on machine's system_ids
+                const filteredSystems = systems.filter(s => 
+                    systemIds.includes(String(s.id))
+                );
+                
+                // Populate system dropdown
+                filteredSystems.forEach(system => {
+                    const option = document.createElement('option');
+                    option.value = system.id;
+                    option.textContent = system.nama_sistem;
+                    systemSelect.appendChild(option);
+                });
+                
+                // Enable system select
+                systemSelect.disabled = false;
+                systemSelect.classList.remove('bg-gray-100');
+            } else {
+                // If no systems found for this machine, disable system select
+                systemSelect.innerHTML = '<option value="">-- Machine ini tidak memiliki system --</option>';
+                systemSelect.disabled = true;
+                systemSelect.classList.add('bg-gray-100');
+            }
+            
+            // Reset problem, reason, action, and part dropdowns when system changes
+            const problemSelect = document.getElementById('problem_select');
+            const reasonSelect = document.getElementById('reason_select');
+            const actionSelect = document.getElementById('action_select');
+            const partSelect = document.getElementById('part_select');
+            
+            if (problemSelect) {
+                problemSelect.innerHTML = '<option value="">-- Pilih System terlebih dahulu --</option>';
+                problemSelect.disabled = true;
+                problemSelect.classList.add('bg-gray-100');
+            }
+            if (reasonSelect) {
+                reasonSelect.innerHTML = '<option value="">-- Pilih Problem terlebih dahulu --</option>';
+                reasonSelect.disabled = true;
+                reasonSelect.classList.add('bg-gray-100');
+            }
+            if (actionSelect) {
+                actionSelect.innerHTML = '<option value="">-- Pilih Reason terlebih dahulu --</option>';
+                actionSelect.disabled = true;
+                actionSelect.classList.add('bg-gray-100');
+            }
+            if (partSelect) {
+                partSelect.innerHTML = '<option value="">-- Pilih System terlebih dahulu --</option>';
+                partSelect.disabled = true;
+                partSelect.classList.add('bg-gray-100');
+            }
+        }
+    };
+    
+    // Clear machine
+    if (clearMachine) {
+        clearMachine.addEventListener('click', function() {
+            if (machineIdInput) machineIdInput.value = '';
+            if (machineSearch) machineSearch.value = '';
+            if (selectedMachine) selectedMachine.classList.add('hidden');
+            
+            // Clear machine details
+            const typeMachine = document.getElementById('typeMachine');
+            const modelMachine = document.getElementById('modelMachine');
+            const brandMachine = document.getElementById('brandMachine');
+            const plant = document.getElementById('plant');
+            const process = document.getElementById('process');
+            const line = document.getElementById('line');
+            const roomName = document.getElementById('roomName');
+            
+            if (typeMachine) typeMachine.value = '';
+            if (modelMachine) modelMachine.value = '';
+            if (brandMachine) brandMachine.value = '';
+            if (plant) plant.value = '';
+            if (process) process.value = '';
+            if (line) line.value = '';
+            if (roomName) roomName.value = '';
+        });
+    }
+    
+    // Close machine dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (machineSearch && machineDropdown) {
+            const isClickInside = machineSearch.contains(e.target) || machineDropdown.contains(e.target);
+            if (!isClickInside) {
+                machineDropdown.classList.add('hidden');
+            }
+        }
     });
     
-    machineDropdown.classList.remove('hidden');
-});
-
-// Select machine
-function selectMachine(id, idMachine, type, model, brand, plantVal, processVal, lineVal, roomVal, kodeRoomVal) {
-    machineIdInput.value = idMachine || '';
-    machineSearch.value = idMachine || '';
-    selectedMachineInfo.innerHTML = `
-        <div class="font-semibold">${idMachine || ''}</div>
-        <div class="text-xs text-gray-600">${type || ''} - ${brand || ''} ${model || ''}</div>
-        <div class="text-xs text-gray-500">${plantVal || ''} / ${processVal || ''} / ${lineVal || ''} / ${roomVal || ''}</div>
-    `;
-    selectedMachine.classList.remove('hidden');
-    machineDropdown.classList.add('hidden');
-    machineSearch.blur();
-    
-    // Auto-fill machine details
-    if (typeMachine) typeMachine.value = type || '';
-    if (modelMachine) modelMachine.value = model || '';
-    if (brandMachine) brandMachine.value = brand || '';
-    
-    // Auto-fill location
-    if (plant) plant.value = plantVal || '';
-    if (process) process.value = processVal || '';
-    if (line) line.value = lineVal || '';
-    if (roomName) roomName.value = roomVal || '';
-    
-    // Set kode_room if hidden field exists
-    const kodeRoomInput = document.getElementById('kode_room');
-    if (kodeRoomInput) {
-        kodeRoomInput.value = kodeRoomVal || '';
+    // Barcode scanner functions
+    if (scanBarcodeBtn && barcodeModal) {
+        scanBarcodeBtn.addEventListener('click', function() {
+            barcodeModal.classList.remove('hidden');
+        });
     }
-}
-
-// Clear machine
-clearMachine.addEventListener('click', function() {
-    machineIdInput.value = '';
-    machineSearch.value = '';
-    selectedMachine.classList.add('hidden');
     
-    // Clear machine details
-    if (typeMachine) typeMachine.value = '';
-    if (modelMachine) modelMachine.value = '';
-    if (brandMachine) brandMachine.value = '';
+    // Manual barcode input
+    if (manualBarcodeInput) {
+        manualBarcodeInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const barcodeValue = this.value.trim();
+                if (barcodeValue) {
+                    // Find machine by ID Machine
+                    const machine = machines.find(m => (m.idMachine && (m.idMachine === barcodeValue || m.idMachine.toLowerCase() === barcodeValue.toLowerCase())));
+                    if (machine) {
+                        // Get system_ids from the machine data
+                        const systemIds = machine.system_ids || [];
+                        selectMachine(
+                            machine.id, 
+                            machine.idMachine, 
+                            machine.typeMachine, 
+                            machine.modelMachine, 
+                            machine.brandMachine,
+                            machine.plant,
+                            machine.process,
+                            machine.line,
+                            machine.roomName,
+                            machine.kodeRoom,
+                            systemIds
+                        );
+                        closeBarcodeModal();
+                    } else {
+                        alert('Machine dengan ID "' + barcodeValue + '" tidak ditemukan.');
+                    }
+                }
+            }
+        });
+    }
     
-    // Clear location
-    if (plant) plant.value = '';
-    if (process) process.value = '';
-    if (line) line.value = '';
-    if (roomName) roomName.value = '';
-});
-
-// Close machine dropdown when clicking outside
-document.addEventListener('click', function(e) {
-    const isClickInside = machineSearch.contains(e.target) || machineDropdown.contains(e.target);
-    if (!isClickInside) {
-        machineDropdown.classList.add('hidden');
+    // Also allow direct paste/input in search field for barcode
+    if (machineSearch) {
+        machineSearch.addEventListener('paste', function(e) {
+            setTimeout(() => {
+                const pastedValue = this.value.trim();
+                if (pastedValue) {
+                    const machine = machines.find(m => (m.idMachine && (m.idMachine === pastedValue || m.idMachine.toLowerCase() === pastedValue.toLowerCase())));
+                    if (machine) {
+                        // Get system_ids from the machine data
+                        const systemIds = machine.system_ids || [];
+                        selectMachine(
+                            machine.id, 
+                            machine.idMachine, 
+                            machine.typeMachine, 
+                            machine.modelMachine, 
+                            machine.brandMachine,
+                            machine.plant,
+                            machine.process,
+                            machine.line,
+                            machine.roomName,
+                            machine.kodeRoom,
+                            systemIds
+                        );
+                    }
+                }
+            }, 100);
+        });
     }
 });
 
-// Barcode scanner functions
-scanBarcodeBtn.addEventListener('click', function() {
-    barcodeModal.classList.remove('hidden');
-});
+// Barcode scanner functions (global functions)
+let stream = null;
+let scanning = false;
 
 function closeBarcodeModal() {
-    barcodeModal.classList.add('hidden');
+    const barcodeModal = document.getElementById('barcode_modal');
+    const manualBarcodeInput = document.getElementById('manual_barcode_input');
+    if (barcodeModal) barcodeModal.classList.add('hidden');
     stopBarcodeScan();
-    manualBarcodeInput.value = '';
+    if (manualBarcodeInput) manualBarcodeInput.value = '';
 }
 
 function startBarcodeScan() {
+    const barcodeVideo = document.getElementById('barcode_video');
+    const barcodeCanvas = document.getElementById('barcode_canvas');
+    
     scanning = true;
     navigator.mediaDevices.getUserMedia({ 
         video: { 
@@ -684,8 +919,10 @@ function startBarcodeScan() {
     })
     .then(function(mediaStream) {
         stream = mediaStream;
-        barcodeVideo.srcObject = mediaStream;
-        barcodeVideo.play();
+        if (barcodeVideo) {
+            barcodeVideo.srcObject = mediaStream;
+            barcodeVideo.play();
+        }
         scanBarcode();
     })
     .catch(function(err) {
@@ -695,16 +932,20 @@ function startBarcodeScan() {
 }
 
 function stopBarcodeScan() {
+    const barcodeVideo = document.getElementById('barcode_video');
     scanning = false;
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
         stream = null;
     }
-    barcodeVideo.srcObject = null;
+    if (barcodeVideo) barcodeVideo.srcObject = null;
 }
 
 function scanBarcode() {
-    if (!scanning) return;
+    const barcodeVideo = document.getElementById('barcode_video');
+    const barcodeCanvas = document.getElementById('barcode_canvas');
+    
+    if (!scanning || !barcodeVideo || !barcodeCanvas) return;
     
     const context = barcodeCanvas.getContext('2d');
     barcodeCanvas.width = barcodeVideo.videoWidth;
@@ -716,56 +957,643 @@ function scanBarcode() {
     requestAnimationFrame(scanBarcode);
 }
 
-// Manual barcode input
-manualBarcodeInput.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        const barcodeValue = this.value.trim();
-        if (barcodeValue) {
-            // Find machine by ID Machine
-            const machine = machines.find(m => (m.idMachine && (m.idMachine === barcodeValue || m.idMachine.toLowerCase() === barcodeValue.toLowerCase())));
-            if (machine) {
-                selectMachine(
-                    machine.id, 
-                    machine.idMachine, 
-                    machine.typeMachine, 
-                    machine.modelMachine, 
-                    machine.brandMachine,
-                    machine.plant,
-                    machine.process,
-                    machine.line,
-                    machine.roomName,
-                    machine.kodeRoom
-                );
-                closeBarcodeModal();
-            } else {
-                alert('Machine dengan ID "' + barcodeValue + '" tidak ditemukan.');
+// System, Problem, Reason, Action, and Part filtering functionality
+const systemSelect = document.getElementById('system_select');
+const problemSelect = document.getElementById('problem_select');
+const reasonSelect = document.getElementById('reason_select');
+const actionSelect = document.getElementById('action_select');
+const partSelect = document.getElementById('part_select');
+const problemDowntime = document.getElementById('problemDowntime');
+const reasonDowntime = document.getElementById('reasonDowntime');
+const actionDowtime = document.getElementById('actionDowtime');
+const partField = document.getElementById('Part');
+
+// Filter problems based on selected system (client-side filtering)
+if (systemSelect) {
+    systemSelect.addEventListener('change', function() {
+        const selectedSystemId = this.value;
+        currentSystemId = selectedSystemId; // Store current system ID for filter
+        
+        // If search filter is active, re-apply it
+        if (problemSearchInput && problemSearchInput.value.trim() !== '') {
+            filterProblemReasonAction(problemSearchInput.value);
+            return; // Don't do normal filtering if search is active
+        }
+        
+        // Clear problem, reason, action, part, and hidden fields
+        problemSelect.innerHTML = '<option value="">-- Pilih Problem --</option>';
+        problemSelect.value = '';
+        reasonSelect.innerHTML = '<option value="">-- Pilih Problem terlebih dahulu --</option>';
+        reasonSelect.value = '';
+        reasonSelect.disabled = true;
+        reasonSelect.classList.add('bg-gray-100');
+        actionSelect.innerHTML = '<option value="">-- Pilih Reason terlebih dahulu --</option>';
+        actionSelect.value = '';
+        actionSelect.disabled = true;
+        actionSelect.classList.add('bg-gray-100');
+        partSelect.innerHTML = '<option value="">-- Pilih Part --</option>';
+        partSelect.value = '';
+        partSelect.disabled = true;
+        partSelect.classList.add('bg-gray-100');
+        if (problemDowntime) problemDowntime.value = '';
+        if (reasonDowntime) reasonDowntime.value = '';
+        if (actionDowtime) actionDowtime.value = '';
+        if (partField) partField.value = '';
+        
+        if (!selectedSystemId) {
+            // Disable problem select if no system selected
+            problemSelect.disabled = true;
+            problemSelect.classList.add('bg-gray-100');
+            return;
+        }
+        
+        // Filter problems that belong to the selected system
+        const filteredProblems = problems.filter(problem => {
+            return problem.system_ids && problem.system_ids.includes(selectedSystemId);
+        });
+        
+        if (filteredProblems.length === 0) {
+            problemSelect.innerHTML = '<option value="">-- Tidak ada problem untuk system ini --</option>';
+            problemSelect.disabled = true;
+            problemSelect.classList.add('bg-gray-100');
+            return;
+        }
+        
+        // Populate problem dropdown (show only problem_header)
+        filteredProblems.forEach(problem => {
+            const option = document.createElement('option');
+            option.value = problem.id;
+            option.textContent = problem.problem_header || problem.name; // Show problem_header, fallback to name if header is empty
+            option.setAttribute('data-problem-name', problem.name);
+            problemSelect.appendChild(option);
+        });
+        
+        // Enable problem select
+        problemSelect.disabled = false;
+        problemSelect.classList.remove('bg-gray-100');
+        
+        // Filter and populate part dropdown based on selected system
+        // PartErp uses 'category' column which stores nama_sistem (string), not system_ids
+        const selectedSystem = systems.find(s => s.id === selectedSystemId);
+        const selectedSystemName = selectedSystem ? selectedSystem.nama_sistem : '';
+        
+        const filteredParts = parts.filter(part => {
+            // Compare part.category (nama_sistem) with selected system's nama_sistem
+            return part.category && part.category === selectedSystemName;
+        });
+        
+        if (filteredParts.length === 0) {
+            partSelect.innerHTML = '<option value="">-- Tidak ada part untuk system ini --</option>';
+            partSelect.disabled = true;
+            partSelect.classList.add('bg-gray-100');
+        } else {
+            // Populate part dropdown (show name and description/specification only, without part_number)
+            filteredParts.forEach(part => {
+                const option = document.createElement('option');
+                option.value = part.id;
+                // Display: name - description (if description exists)
+                const displayText = part.description 
+                    ? `${part.name} - ${part.description}` 
+                    : part.name;
+                option.textContent = displayText;
+                option.setAttribute('data-part-name', part.name);
+                option.setAttribute('data-part-description', part.description || '');
+                partSelect.appendChild(option);
+            });
+            
+            // Enable part select
+            partSelect.disabled = false;
+            partSelect.classList.remove('bg-gray-100');
+        }
+    });
+}
+
+// Auto-fill problemDowntime and enable reason when problem is selected
+if (problemSelect) {
+    problemSelect.addEventListener('change', function() {
+        const selectedProblemId = this.value;
+        
+        // Clear reason, action, and hidden fields
+        reasonSelect.innerHTML = '<option value="">-- Pilih Reason --</option>';
+        reasonSelect.value = '';
+        reasonSelect.disabled = true;
+        reasonSelect.classList.add('bg-gray-100');
+        actionSelect.innerHTML = '<option value="">-- Pilih Reason terlebih dahulu --</option>';
+        actionSelect.value = '';
+        actionSelect.disabled = true;
+        actionSelect.classList.add('bg-gray-100');
+        if (reasonDowntime) reasonDowntime.value = '';
+        if (actionDowtime) actionDowtime.value = '';
+        
+        if (!selectedProblemId) {
+            if (problemDowntime) problemDowntime.value = '';
+            return;
+        }
+        
+        // Find the selected problem
+        const selectedProblem = problems.find(p => p.id === selectedProblemId);
+        
+        if (selectedProblem) {
+            // Auto-fill problemDowntime with problem name
+            if (problemDowntime) {
+                problemDowntime.value = selectedProblem.name;
             }
+            
+            // Populate reason dropdown (all reasons available)
+            reasons.forEach(reason => {
+                const option = document.createElement('option');
+                option.value = reason.id;
+                option.textContent = reason.name;
+                option.setAttribute('data-reason-name', reason.name);
+                reasonSelect.appendChild(option);
+            });
+            
+            // Enable reason select
+            reasonSelect.disabled = false;
+            reasonSelect.classList.remove('bg-gray-100');
+        }
+    });
+}
+
+// Auto-fill reasonDowntime and enable action when reason is selected
+if (reasonSelect) {
+    reasonSelect.addEventListener('change', function() {
+        const selectedReasonId = this.value;
+        
+        // Clear action and hidden field
+        actionSelect.innerHTML = '<option value="">-- Pilih Action --</option>';
+        actionSelect.value = '';
+        actionSelect.disabled = true;
+        actionSelect.classList.add('bg-gray-100');
+        if (actionDowtime) actionDowtime.value = '';
+        
+        if (!selectedReasonId) {
+            if (reasonDowntime) reasonDowntime.value = '';
+            return;
+        }
+        
+        // Find the selected reason
+        const selectedReason = reasons.find(r => r.id === selectedReasonId);
+        
+        if (selectedReason) {
+            // Auto-fill reasonDowntime with reason name
+            if (reasonDowntime) {
+                reasonDowntime.value = selectedReason.name;
+            }
+            
+            // Populate action dropdown (all actions available)
+            actions.forEach(action => {
+                const option = document.createElement('option');
+                option.value = action.id;
+                option.textContent = action.name;
+                option.setAttribute('data-action-name', action.name);
+                actionSelect.appendChild(option);
+            });
+            
+            // Enable action select
+            actionSelect.disabled = false;
+            actionSelect.classList.remove('bg-gray-100');
+        }
+    });
+}
+
+// Auto-fill actionDowtime when action is selected
+if (actionSelect) {
+    actionSelect.addEventListener('change', function() {
+        const selectedActionId = this.value;
+        
+        if (!selectedActionId) {
+            if (actionDowtime) actionDowtime.value = '';
+            return;
+        }
+        
+        // Find the selected action
+        const selectedAction = actions.find(a => a.id === selectedActionId);
+        
+        if (selectedAction && actionDowtime) {
+            // Auto-fill actionDowtime with action name
+            actionDowtime.value = selectedAction.name;
+        }
+    });
+}
+
+// Auto-fill Part field when part is selected
+if (partSelect) {
+    partSelect.addEventListener('change', function() {
+        const selectedPartId = this.value;
+        
+        if (!selectedPartId) {
+            if (partField) partField.value = '';
+            return;
+        }
+        
+        // Find the selected part
+        const selectedPart = parts.find(p => p.id === selectedPartId);
+        
+        if (selectedPart && partField) {
+            // Auto-fill Part with part name
+            partField.value = selectedPart.name;
+        }
+    });
+}
+
+// Problem search filter
+const problemSearchInput = document.getElementById('problem_search');
+const actionSuggestionsDiv = document.getElementById('action_suggestions');
+let currentSystemId = null; // Store current selected system ID
+let isFiltering = false; // Flag to prevent normal filtering when search is active
+let selectedActionIndex = -1; // For keyboard navigation
+
+// Function to filter dropdowns based on search text
+function filterProblemReasonAction(searchText) {
+    const searchLower = (searchText || '').toLowerCase().trim();
+    
+    if (!searchText || searchLower === '') {
+        // If search is empty, restore normal filtering based on system
+        isFiltering = false;
+        if (currentSystemId && systemSelect && systemSelect.value) {
+            // Re-trigger system change to restore normal filtering
+            const systemValue = systemSelect.value;
+            systemSelect.value = '';
+            setTimeout(() => {
+                systemSelect.value = systemValue;
+                systemSelect.dispatchEvent(new Event('change'));
+            }, 10);
+        } else if (systemSelect && !systemSelect.value) {
+            // If no system selected, clear all dropdowns
+            if (problemSelect) {
+                problemSelect.innerHTML = '<option value="">-- Pilih System terlebih dahulu --</option>';
+                problemSelect.disabled = true;
+                problemSelect.classList.add('bg-gray-100');
+            }
+            if (reasonSelect) {
+                reasonSelect.innerHTML = '<option value="">-- Pilih Problem terlebih dahulu --</option>';
+                reasonSelect.disabled = true;
+                reasonSelect.classList.add('bg-gray-100');
+            }
+            if (actionSelect) {
+                actionSelect.innerHTML = '<option value="">-- Pilih Reason terlebih dahulu --</option>';
+                actionSelect.disabled = true;
+                actionSelect.classList.add('bg-gray-100');
+            }
+        }
+        return;
+    }
+    
+    isFiltering = true;
+    
+    // Find matching problems (by name or problem_header)
+    const matchingProblems = problems.filter(p => {
+        const nameMatch = (p.name || '').toLowerCase().includes(searchLower);
+        const headerMatch = (p.problem_header || '').toLowerCase().includes(searchLower);
+        return nameMatch || headerMatch;
+    });
+    
+    // Find matching reasons (by name)
+    const matchingReasons = reasons.filter(r => {
+        return (r.name || '').toLowerCase().includes(searchLower);
+    });
+    
+    // Find matching actions (by name)
+    const matchingActions = actions.filter(a => {
+        return (a.name || '').toLowerCase().includes(searchLower);
+    });
+    
+    // Determine what to show based on matches
+    let problemsToShow = [];
+    let reasonsToShow = [];
+    let actionsToShow = [];
+    
+    if (matchingActions.length > 0) {
+        // If actions match, show all problems (filtered by system if system selected) and all reasons
+        problemsToShow = currentSystemId 
+            ? problems.filter(p => p.system_ids && p.system_ids.includes(currentSystemId))
+            : problems;
+        reasonsToShow = reasons; // All reasons (because action can be selected after any reason)
+        actionsToShow = matchingActions;
+    } else if (matchingReasons.length > 0) {
+        // If reasons match, show all problems (filtered by system if system selected)
+        problemsToShow = currentSystemId 
+            ? problems.filter(p => p.system_ids && p.system_ids.includes(currentSystemId))
+            : problems;
+        reasonsToShow = matchingReasons;
+        actionsToShow = []; // Clear actions
+    } else if (matchingProblems.length > 0) {
+        // Only problems match
+        problemsToShow = matchingProblems.filter(p => {
+            // Still respect system filter if system is selected
+            if (currentSystemId) {
+                return p.system_ids && p.system_ids.includes(currentSystemId);
+            }
+            return true;
+        });
+        reasonsToShow = []; // Clear reasons
+        actionsToShow = []; // Clear actions
+    } else {
+        // No matches
+        problemsToShow = [];
+        reasonsToShow = [];
+        actionsToShow = [];
+    }
+    
+    // Update problem dropdown
+    if (problemSelect) {
+        problemSelect.innerHTML = '<option value="">-- Pilih Problem --</option>';
+        problemsToShow.forEach(problem => {
+            const option = document.createElement('option');
+            option.value = problem.id;
+            option.textContent = problem.problem_header || problem.name;
+            option.setAttribute('data-problem-name', problem.name);
+            option.setAttribute('data-problem-header', problem.problem_header || '');
+            problemSelect.appendChild(option);
+        });
+        
+        if (problemsToShow.length > 0) {
+            problemSelect.disabled = false;
+            problemSelect.classList.remove('bg-gray-100');
+        } else {
+            problemSelect.disabled = true;
+            problemSelect.classList.add('bg-gray-100');
         }
     }
-});
+    
+    // Update reason dropdown
+    if (reasonSelect) {
+        reasonSelect.innerHTML = '<option value="">-- Pilih Reason --</option>';
+        if (problemsToShow.length > 0 || matchingReasons.length > 0 || matchingActions.length > 0) {
+            reasonsToShow.forEach(reason => {
+                const option = document.createElement('option');
+                option.value = reason.id;
+                option.textContent = reason.name;
+                option.setAttribute('data-reason-name', reason.name);
+                reasonSelect.appendChild(option);
+            });
+            
+            if (reasonsToShow.length > 0) {
+                reasonSelect.disabled = false;
+                reasonSelect.classList.remove('bg-gray-100');
+            } else {
+                reasonSelect.disabled = true;
+                reasonSelect.classList.add('bg-gray-100');
+            }
+        } else {
+            reasonSelect.disabled = true;
+            reasonSelect.classList.add('bg-gray-100');
+        }
+    }
+    
+    // Update action dropdown
+    if (actionSelect) {
+        actionSelect.innerHTML = '<option value="">-- Pilih Action --</option>';
+        if (reasonsToShow.length > 0 || matchingActions.length > 0) {
+            actionsToShow.forEach(action => {
+                const option = document.createElement('option');
+                option.value = action.id;
+                option.textContent = action.name;
+                option.setAttribute('data-action-name', action.name);
+                actionSelect.appendChild(option);
+            });
+            
+            if (actionsToShow.length > 0) {
+                actionSelect.disabled = false;
+                actionSelect.classList.remove('bg-gray-100');
+            } else {
+                actionSelect.disabled = true;
+                actionSelect.classList.add('bg-gray-100');
+            }
+        } else {
+            actionSelect.disabled = true;
+            actionSelect.classList.add('bg-gray-100');
+        }
+    }
+}
 
-// Also allow direct paste/input in search field for barcode
-machineSearch.addEventListener('paste', function(e) {
+// Function to show action suggestions
+function showActionSuggestions(searchText) {
+    if (!actionSuggestionsDiv || !searchText || searchText.trim() === '') {
+        actionSuggestionsDiv.classList.add('hidden');
+        return;
+    }
+    
+    const searchLower = searchText.toLowerCase().trim();
+    const matchingActions = actions.filter(a => {
+        const nameMatch = (a.name || '').toLowerCase().includes(searchLower);
+        const systemMatch = (a.system_name || '').toLowerCase().includes(searchLower);
+        const problemMatch = (a.problem_name || '').toLowerCase().includes(searchLower) || 
+                           (a.problem_header || '').toLowerCase().includes(searchLower);
+        const reasonMatch = (a.reason_name || '').toLowerCase().includes(searchLower);
+        return nameMatch || systemMatch || problemMatch || reasonMatch;
+    });
+    
+    if (matchingActions.length === 0) {
+        actionSuggestionsDiv.classList.add('hidden');
+        return;
+    }
+    
+    // Build suggestions HTML
+    let suggestionsHTML = '';
+    matchingActions.slice(0, 10).forEach((action, index) => {
+        const displayText = `${action.name} (${action.system_name || 'N/A'} - ${action.problem_header || action.problem_name || 'N/A'} - ${action.reason_name || 'N/A'})`;
+        suggestionsHTML += `
+            <div class="action-suggestion-item px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 ${index === selectedActionIndex ? 'bg-blue-100' : ''}" 
+                 data-action-id="${action.id}"
+                 data-system-id="${action.system_id || ''}"
+                 data-system-name="${action.system_name || ''}"
+                 data-problem-id="${action.problem_id || ''}"
+                 data-problem-name="${action.problem_name || ''}"
+                 data-problem-header="${action.problem_header || ''}"
+                 data-reason-id="${action.reason_id || ''}"
+                 data-reason-name="${action.reason_name || ''}"
+                 data-action-name="${action.name || ''}">
+                <div class="font-semibold text-sm text-gray-900">${action.name}</div>
+                <div class="text-xs text-gray-500">${action.system_name || 'N/A'} → ${action.problem_header || action.problem_name || 'N/A'} → ${action.reason_name || 'N/A'}</div>
+            </div>
+        `;
+    });
+    
+    actionSuggestionsDiv.innerHTML = suggestionsHTML;
+    actionSuggestionsDiv.classList.remove('hidden');
+    
+    // Add click event listeners to suggestions
+    actionSuggestionsDiv.querySelectorAll('.action-suggestion-item').forEach(item => {
+        item.addEventListener('click', function() {
+            selectActionFromSuggestion(this);
+        });
+    });
+}
+
+// Function to select action from suggestion
+function selectActionFromSuggestion(element) {
+    const actionId = element.getAttribute('data-action-id');
+    const systemId = element.getAttribute('data-system-id');
+    const systemName = element.getAttribute('data-system-name');
+    const problemId = element.getAttribute('data-problem-id');
+    const problemName = element.getAttribute('data-problem-name');
+    const problemHeader = element.getAttribute('data-problem-header');
+    const reasonId = element.getAttribute('data-reason-id');
+    const reasonName = element.getAttribute('data-reason-name');
+    const actionName = element.getAttribute('data-action-name');
+    
+    // Hide suggestions
+    actionSuggestionsDiv.classList.add('hidden');
+    problemSearchInput.value = '';
+    selectedActionIndex = -1;
+    
+    // Auto-fill System (enable first if machine is selected)
+    if (systemSelect && systemId) {
+        // Enable system select if machine is already selected
+        if (document.getElementById('idMachine') && document.getElementById('idMachine').value) {
+            systemSelect.disabled = false;
+            systemSelect.classList.remove('bg-gray-100');
+        }
+        
+        // Check if system option exists
+        const systemOption = Array.from(systemSelect.options).find(opt => opt.value === systemId);
+        if (systemOption) {
+            systemSelect.value = systemId;
+            currentSystemId = systemId;
+            systemSelect.dispatchEvent(new Event('change'));
+        }
+    }
+    
+    // Wait a bit for system change to populate problems, then set problem
     setTimeout(() => {
-        const pastedValue = this.value.trim();
-        if (pastedValue) {
-            const machine = machines.find(m => (m.idMachine && (m.idMachine === pastedValue || m.idMachine.toLowerCase() === pastedValue.toLowerCase())));
-            if (machine) {
-                selectMachine(
-                    machine.id, 
-                    machine.idMachine, 
-                    machine.typeMachine, 
-                    machine.modelMachine, 
-                    machine.brandMachine,
-                    machine.plant,
-                    machine.process,
-                    machine.line,
-                    machine.roomName,
-                    machine.kodeRoom
-                );
+        if (problemSelect && problemId) {
+            // Check if problem exists in dropdown
+            const problemOption = Array.from(problemSelect.options).find(opt => opt.value === problemId);
+            if (problemOption) {
+                problemSelect.value = problemId;
+                problemSelect.dispatchEvent(new Event('change'));
+                
+                // Auto-fill Problem Downtime
+                const problemDowntimeField = document.getElementById('problemDowntime');
+                if (problemDowntimeField) {
+                    problemDowntimeField.value = problemHeader || problemName;
+                }
+                
+                // Wait a bit for problem change to populate reasons, then set reason
+                setTimeout(() => {
+                    if (reasonSelect && reasonId) {
+                        // Check if reason exists in dropdown
+                        const reasonOption = Array.from(reasonSelect.options).find(opt => opt.value === reasonId);
+                        if (reasonOption) {
+                            reasonSelect.value = reasonId;
+                            reasonSelect.dispatchEvent(new Event('change'));
+                            
+                            // Auto-fill Reason Downtime
+                            const reasonDowntimeField = document.getElementById('reasonDowntime');
+                            if (reasonDowntimeField) {
+                                reasonDowntimeField.value = reasonName;
+                            }
+                            
+                            // Wait a bit for reason change to populate actions, then set action
+                            setTimeout(() => {
+                                if (actionSelect && actionId) {
+                                    // Check if action exists in dropdown
+                                    const actionOption = Array.from(actionSelect.options).find(opt => opt.value === actionId);
+                                    if (actionOption) {
+                                        actionSelect.value = actionId;
+                                        actionSelect.dispatchEvent(new Event('change'));
+                                        
+                                        // Auto-fill Action Downtime
+                                        const actionDowntimeField = document.getElementById('actionDowtime');
+                                        if (actionDowntimeField) {
+                                            actionDowntimeField.value = actionName;
+                                        }
+                                    }
+                                }
+                            }, 300);
+                        }
+                    }
+                }, 300);
             }
         }
-    }, 100);
+    }, 300);
+}
+
+// Add event listener for problem search
+if (problemSearchInput) {
+    problemSearchInput.addEventListener('input', function() {
+        const searchText = this.value;
+        
+        // Show action suggestions if text is entered
+        showActionSuggestions(searchText);
+        
+        // Also filter dropdowns
+        filterProblemReasonAction(searchText);
+    });
+    
+    // Keyboard navigation for suggestions
+    problemSearchInput.addEventListener('keydown', function(e) {
+        const suggestions = actionSuggestionsDiv.querySelectorAll('.action-suggestion-item');
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedActionIndex = Math.min(selectedActionIndex + 1, suggestions.length - 1);
+            suggestions[selectedActionIndex]?.scrollIntoView({ block: 'nearest' });
+            showActionSuggestions(this.value); // Re-render to highlight
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedActionIndex = Math.max(selectedActionIndex - 1, -1);
+            if (selectedActionIndex >= 0) {
+                suggestions[selectedActionIndex]?.scrollIntoView({ block: 'nearest' });
+                showActionSuggestions(this.value); // Re-render to highlight
+            }
+        } else if (e.key === 'Enter' && selectedActionIndex >= 0 && suggestions[selectedActionIndex]) {
+            e.preventDefault();
+            selectActionFromSuggestion(suggestions[selectedActionIndex]);
+            selectedActionIndex = -1;
+        } else if (e.key === 'Escape') {
+            this.value = '';
+            actionSuggestionsDiv.classList.add('hidden');
+            filterProblemReasonAction('');
+            selectedActionIndex = -1;
+        }
+    });
+    
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!problemSearchInput.contains(e.target) && !actionSuggestionsDiv.contains(e.target)) {
+            actionSuggestionsDiv.classList.add('hidden');
+            selectedActionIndex = -1;
+        }
+    });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // If old value exists for system, trigger change to populate problems
+    if (systemSelect && systemSelect.value) {
+        currentSystemId = systemSelect.value;
+        systemSelect.dispatchEvent(new Event('change'));
+        
+        // If old value exists for problem, set it
+        const oldProblemId = '{{ old("problem_select") }}';
+        if (oldProblemId && problemSelect) {
+            setTimeout(() => {
+                problemSelect.value = oldProblemId;
+                problemSelect.dispatchEvent(new Event('change'));
+                
+                // If old value exists for reason, set it
+                const oldReasonId = '{{ old("reason_select") }}';
+                if (oldReasonId && reasonSelect) {
+                    setTimeout(() => {
+                        reasonSelect.value = oldReasonId;
+                        reasonSelect.dispatchEvent(new Event('change'));
+                        
+                        // If old value exists for action, set it
+                        const oldActionId = '{{ old("action_select") }}';
+                        if (oldActionId && actionSelect) {
+                            setTimeout(() => {
+                                actionSelect.value = oldActionId;
+                                actionSelect.dispatchEvent(new Event('change'));
+                            }, 100);
+                        }
+                    }, 100);
+                }
+            }, 100);
+        }
+    }
 });
 </script>
 @endsection

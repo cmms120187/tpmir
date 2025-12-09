@@ -102,7 +102,10 @@
                             Add Variant
                         </button>
                     </div>
-                    <p class="text-xs text-gray-500 mb-3">Tambahkan variants untuk standar yang memiliki beberapa zone/level (contoh: ISO 10816-3 dengan zone A, B, C, D)</p>
+                    <p class="text-xs text-gray-500 mb-3">
+                        Tambahkan variants untuk standar yang memiliki beberapa zone/level (contoh: ISO 10816-3 dengan zone A, B, C, D). 
+                        <strong>Maksimal 4 variants</strong> dengan pilihan warna: Hijau (Aman), Kuning (Perlu Perhatian), Orange (Perlu Pengawasan), Merah (Perlu Perbaikan).
+                    </p>
                     <div id="variants-container" class="space-y-3">
                         <!-- Variant rows will be added here dynamically -->
                     </div>
@@ -160,15 +163,49 @@
                                 <div class="flex flex-wrap gap-3">
                                     @if($standard->photos)
                                         @foreach($standard->photos as $photo)
+                                            @php
+                                                // Cek apakah file dengan path asli ada
+                                                $photoPath = $photo->photo_path;
+                                                $actualPath = $photoPath;
+                                                
+                                                // Jika file tidak ada, coba cari dengan ekstensi .webp
+                                                if (!Storage::disk('public')->exists($photoPath)) {
+                                                    $pathInfo = pathinfo($photoPath);
+                                                    $webpPath = ($pathInfo['dirname'] !== '.' ? $pathInfo['dirname'] . '/' : '') . $pathInfo['filename'] . '.webp';
+                                                    if (Storage::disk('public')->exists($webpPath)) {
+                                                        $actualPath = $webpPath;
+                                                    }
+                                                }
+                                            @endphp
                                             <div class="relative">
-                                                <img src="{{ Storage::url($photo->photo_path) }}" alt="{{ $photo->name }}" class="w-24 h-24 object-cover rounded border">
+                                                <img src="{{ asset('public-storage/' . $actualPath) }}" alt="{{ $photo->name }}" class="w-24 h-24 object-cover rounded border" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                                <div class="w-24 h-24 bg-gray-200 rounded border flex items-center justify-center hidden">
+                                                    <span class="text-xs text-gray-500">No Image</span>
+                                                </div>
                                                 <p class="text-xs text-gray-600 mt-1 text-center">{{ $photo->name ?? 'Photo #' . $photo->id }}</p>
                                             </div>
                                         @endforeach
                                     @endif
                                     @if($standard->photo && (!$standard->photos || $standard->photos->count() == 0))
+                                        @php
+                                            // Cek apakah file dengan path asli ada
+                                            $photoPath = $standard->photo;
+                                            $actualPath = $photoPath;
+                                            
+                                            // Jika file tidak ada, coba cari dengan ekstensi .webp
+                                            if (!Storage::disk('public')->exists($photoPath)) {
+                                                $pathInfo = pathinfo($photoPath);
+                                                $webpPath = ($pathInfo['dirname'] !== '.' ? $pathInfo['dirname'] . '/' : '') . $pathInfo['filename'] . '.webp';
+                                                if (Storage::disk('public')->exists($webpPath)) {
+                                                    $actualPath = $webpPath;
+                                                }
+                                            }
+                                        @endphp
                                         <div class="relative">
-                                            <img src="{{ Storage::url($standard->photo) }}" alt="{{ $standard->name }}" class="w-24 h-24 object-cover rounded border">
+                                            <img src="{{ Storage::disk('public')->url($actualPath) }}" alt="{{ $standard->name }}" class="w-24 h-24 object-cover rounded border" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                            <div class="w-24 h-24 bg-gray-200 rounded border flex items-center justify-center hidden">
+                                                <span class="text-xs text-gray-500">No Image</span>
+                                            </div>
                                             <p class="text-xs text-gray-600 mt-1 text-center">Photo Lama</p>
                                         </div>
                                     @endif
@@ -187,12 +224,29 @@
                                                 $selectedPhotoIds = old('standard_photo_ids', $standard->photos->pluck('id')->toArray());
                                             @endphp
                                             @foreach($standardPhotos as $photo)
+                                                @php
+                                                    // Cek apakah file dengan path asli ada
+                                                    $photoPath = $photo->photo_path;
+                                                    $actualPath = $photoPath;
+                                                    
+                                                    // Jika file tidak ada, coba cari dengan ekstensi .webp
+                                                    if (!Storage::disk('public')->exists($photoPath)) {
+                                                        $pathInfo = pathinfo($photoPath);
+                                                        $webpPath = ($pathInfo['dirname'] !== '.' ? $pathInfo['dirname'] . '/' : '') . $pathInfo['filename'] . '.webp';
+                                                        if (Storage::disk('public')->exists($webpPath)) {
+                                                            $actualPath = $webpPath;
+                                                        }
+                                                    }
+                                                @endphp
                                                 <label class="flex items-start p-2 border rounded hover:bg-gray-50 cursor-pointer {{ in_array($photo->id, $selectedPhotoIds) ? 'bg-blue-50 border-blue-300' : '' }}">
                                                     <input type="checkbox" name="standard_photo_ids[]" value="{{ $photo->id }}" 
                                                            {{ in_array($photo->id, $selectedPhotoIds) ? 'checked' : '' }}
                                                            class="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                                                     <div class="ml-2 flex-1">
-                                                        <img src="{{ Storage::url($photo->photo_path) }}" alt="{{ $photo->name }}" class="w-full h-20 object-cover rounded mb-1">
+                                                        <img src="{{ asset('public-storage/' . $actualPath) }}" alt="{{ $photo->name }}" class="w-full h-20 object-cover rounded mb-1" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                                        <div class="w-full h-20 bg-gray-200 rounded mb-1 flex items-center justify-center hidden">
+                                                            <span class="text-xs text-gray-500">No Image</span>
+                                                        </div>
                                                         <p class="text-xs text-gray-600">{{ $photo->name ?? 'Photo #' . $photo->id }}</p>
                                                     </div>
                                                 </label>
@@ -236,10 +290,25 @@
 
 <script>
     let variantIndex = 0;
+    const MAX_VARIANTS = 4;
+    const colorOptions = [
+        { value: '#22C55E', label: 'Hijau - Aman (Safe)' },
+        { value: '#FACC15', label: 'Kuning - Perlu Perhatian (Caution)' },
+        { value: '#FB923C', label: 'Orange - Perlu Pengawasan (Warning)' },
+        { value: '#EF4444', label: 'Merah - Perlu Perbaikan (Danger)' },
+    ];
     const existingVariants = @json($standard->variants->sortBy('order')->values());
 
     function addVariantRow(variant = null) {
         const container = document.getElementById('variants-container');
+        const currentVariants = container.querySelectorAll('.variant-row').length;
+        
+        // Check max variants limit
+        if (currentVariants >= MAX_VARIANTS) {
+            alert(`Maksimal ${MAX_VARIANTS} variants yang dapat ditambahkan.`);
+            return;
+        }
+        
         const row = document.createElement('div');
         row.className = 'border rounded p-4 bg-gray-50 variant-row';
         row.dataset.index = variantIndex;
@@ -247,6 +316,11 @@
         const isEdit = variant !== null;
         const variantData = variant || { name: '', min_value: '', max_value: '', color: '#22C55E', order: variantIndex + 1 };
         const variantId = variant ? variant.id : '';
+        
+        // Build color options HTML
+        const colorOptionsHtml = colorOptions.map(opt => 
+            `<option value="${opt.value}" ${variantData.color === opt.value ? 'selected' : ''}>${opt.label}</option>`
+        ).join('');
         
         row.innerHTML = `
             <div class="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
@@ -271,12 +345,17 @@
                 <div class="flex gap-2">
                     <div class="flex-1">
                         <label class="block text-xs font-medium text-gray-700 mb-1">Color</label>
-                        <input type="color" name="variants[${variantIndex}][color]" 
-                               value="${variantData.color || '#22C55E'}" 
-                               class="w-full h-8 border rounded" title="Pilih warna">
+                        <select name="variants[${variantIndex}][color]" 
+                                class="w-full border rounded px-2 py-1 text-sm variant-color-select" 
+                                required
+                                onchange="updateColorPreview(this)">
+                            ${colorOptionsHtml}
+                        </select>
+                        <div class="mt-1 w-full h-6 rounded border variant-color-preview" 
+                             style="background-color: ${variantData.color || '#22C55E'}"></div>
                     </div>
                     <button type="button" onclick="removeVariantRow(this)" 
-                            class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-sm" 
+                            class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-sm self-end" 
                             title="Hapus variant">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -290,11 +369,38 @@
         
         container.appendChild(row);
         variantIndex++;
+        updateAddButtonState();
+    }
+    
+    function updateColorPreview(select) {
+        const preview = select.closest('.variant-row').querySelector('.variant-color-preview');
+        if (preview) {
+            preview.style.backgroundColor = select.value;
+        }
+    }
+    
+    function updateAddButtonState() {
+        const container = document.getElementById('variants-container');
+        const currentVariants = container.querySelectorAll('.variant-row').length;
+        const addButton = document.querySelector('button[onclick="addVariantRow()"]');
+        
+        if (currentVariants >= MAX_VARIANTS) {
+            if (addButton) {
+                addButton.disabled = true;
+                addButton.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        } else {
+            if (addButton) {
+                addButton.disabled = false;
+                addButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
     }
 
     function removeVariantRow(button) {
         const row = button.closest('.variant-row');
         row.remove();
+        updateAddButtonState();
     }
 
     // Load existing variants on page load
@@ -302,6 +408,7 @@
         existingVariants.forEach(variant => {
             addVariantRow(variant);
         });
+        updateAddButtonState();
     });
 
     // Photo preview

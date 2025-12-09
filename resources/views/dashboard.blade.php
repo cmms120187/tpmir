@@ -120,15 +120,41 @@
                 Dashboard
             </h1>
             <p class="text-base sm:text-lg lg:text-xl text-gray-600 font-medium">
-                This Month - {{ \Carbon\Carbon::create($currentYear, $currentMonth, 1)->format('F Y') }}
+                {{ \Carbon\Carbon::create($filterYear, $filterMonth, 1)->locale('id')->translatedFormat('F Y') }}
             </p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <label for="data_source" class="text-sm font-semibold text-gray-700 whitespace-nowrap">Data Source:</label>
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <!-- Filter Bulan dan Tahun -->
+                    <form method="GET" action="{{ route('dashboard') }}" class="flex items-center gap-2" id="filterForm">
+                        <input type="hidden" name="data_source" value="{{ $dataSource }}">
+                        <label for="month" class="text-sm font-semibold text-gray-700 whitespace-nowrap">Bulan:</label>
+                        <select name="month" id="month" 
+                                onchange="document.getElementById('filterForm').submit();"
+                                class="px-3 py-2 border border-gray-300 rounded-lg shadow-sm bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all">
+                            @for($i = 1; $i <= 12; $i++)
+                                <option value="{{ $i }}" {{ $filterMonth == $i ? 'selected' : '' }}>
+                                    {{ \Carbon\Carbon::create(null, $i, 1)->locale('id')->translatedFormat('F') }}
+                                </option>
+                            @endfor
+                        </select>
+                        <label for="year" class="text-sm font-semibold text-gray-700 whitespace-nowrap">Tahun:</label>
+                        <select name="year" id="year" 
+                                onchange="document.getElementById('filterForm').submit();"
+                                class="px-3 py-2 border border-gray-300 rounded-lg shadow-sm bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all">
+                            @for($y = now()->year - 2; $y <= now()->year + 2; $y++)
+                                <option value="{{ $y }}" {{ $filterYear == $y ? 'selected' : '' }}>{{ $y }}</option>
+                            @endfor
+                        </select>
+                    </form>
+                    <!-- Data Source -->
                     <form method="GET" action="{{ route('dashboard') }}" class="inline-block" id="dataSourceForm">
+                        <input type="hidden" name="month" value="{{ $filterMonth }}">
+                        <input type="hidden" name="year" value="{{ $filterYear }}">
+                        <label for="data_source" class="text-sm font-semibold text-gray-700 whitespace-nowrap">Data Source:</label>
                         <select name="data_source" id="data_source" 
                                 onchange="document.getElementById('dataSourceForm').submit();"
                                 class="px-4 py-2 border border-gray-300 rounded-lg shadow-sm bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all">
+                            <option value="downtime_erp2" {{ $dataSource === 'downtime_erp2' ? 'selected' : '' }}>Downtime ERP2</option>
                             <option value="downtime_erp" {{ $dataSource === 'downtime_erp' ? 'selected' : '' }}>Downtime ERP</option>
                             <option value="downtime" {{ $dataSource === 'downtime' ? 'selected' : '' }}>Downtime</option>
                         </select>
@@ -151,7 +177,7 @@
                 <div>
                     <p class="text-xs sm:text-sm font-medium text-white/80 mb-1">Total Breakdowns</p>
                     <p class="text-2xl sm:text-3xl lg:text-4xl font-bold mt-2 animate-pulse-slow">{{ number_format($monthDowntimeCount) }}</p>
-                    <p class="text-xs text-white/70 mt-2">This Month</p>
+                    <p class="text-xs text-white/70 mt-2">{{ \Carbon\Carbon::create($filterYear, $filterMonth, 1)->locale('id')->translatedFormat('F Y') }}</p>
                 </div>
             </div>
             
@@ -216,7 +242,7 @@
                     <p class="text-sm font-medium text-white/80 mb-1">Top Machine</p>
                     @if($mostProblematicMachine)
                         <p class="text-lg sm:text-xl lg:text-2xl font-bold mt-2 animate-pulse-slow" title="{{ $mostProblematicMachine->idMachine }}">{{ strlen($mostProblematicMachine->idMachine) > 12 ? substr($mostProblematicMachine->idMachine, 0, 12) . '...' : $mostProblematicMachine->idMachine }}</p>
-                        <p class="text-xs text-white/70 mt-2">{{ number_format($mostProblematicMachine->total_duration, 0) }} min</p>
+                        <p class="text-xs text-white/70 mt-2">{{ number_format((float)($mostProblematicMachine->total_duration ?? 0), 0) }} min</p>
                     @else
                         <p class="text-lg sm:text-xl lg:text-2xl font-bold mt-2">-</p>
                         <p class="text-xs text-white/70 mt-2">No data</p>
@@ -278,7 +304,7 @@
             <!-- Downtime Trend -->
             <div class="chart-card rounded-xl shadow-lg p-6 lg:col-span-2 animate-fade-in-up delay-500">
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Downtime Trend (This Month)</h2>
+                    <h2 class="text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Downtime Trend ({{ \Carbon\Carbon::create($filterYear, $filterMonth, 1)->locale('id')->translatedFormat('F Y') }})</h2>
                     <a href="{{ $dataSource === 'downtime_erp' ? route('downtime_erp.index') : route('downtimes.index') }}" class="text-xs text-blue-600 hover:text-blue-800 font-semibold">View →</a>
                 </div>
                 @if($downtimeTrend->count() > 0)
@@ -346,7 +372,7 @@
                             <span class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm mr-3">{{ $index + 1 }}</span>
                             <span class="font-semibold text-gray-800">{{ $line->line ?? 'N/A' }}</span>
                         </div>
-                        <span class="text-sm font-bold text-blue-600">{{ number_format($line->total_duration, 0) }}m</span>
+                        <span class="text-sm font-bold text-blue-600">{{ number_format((float)($line->total_duration ?? 0), 0) }}m</span>
                     </div>
                     @empty
                     <p class="text-sm text-gray-500">No data</p>
@@ -370,7 +396,7 @@
                     </div>
                     <div class="p-4 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg">
                         <p class="text-sm font-medium text-gray-600 mb-1">Duration</p>
-                        <p class="text-lg sm:text-xl lg:text-2xl font-bold text-red-600">{{ number_format($longestDowntime->duration ?? 0, 1) }} <span class="text-xs sm:text-sm">min</span></p>
+                        <p class="text-lg sm:text-xl lg:text-2xl font-bold text-red-600">{{ number_format((float)($longestDowntime->duration ?? 0), 1) }} <span class="text-xs sm:text-sm">min</span></p>
                     </div>
                     <div class="p-4 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg">
                         <p class="text-sm font-medium text-gray-600 mb-1">Date</p>
@@ -416,9 +442,9 @@
                     <svg class="w-6 h-6 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Recent Downtime Events (This Month)
+                    Recent Downtime Events ({{ \Carbon\Carbon::create($filterYear, $filterMonth, 1)->locale('id')->translatedFormat('F Y') }})
                 </h2>
-                <a href="{{ $dataSource === 'downtime_erp' ? route('downtime_erp.index') : route('downtimes.index') }}" class="text-sm text-blue-600 hover:text-blue-800 font-semibold transition-all hover:translate-x-1">View all →</a>
+                <a href="{{ $dataSource === 'downtime_erp2' ? route('downtime-erp2.index') : ($dataSource === 'downtime_erp' ? route('downtime_erp.index') : route('downtimes.index')) }}" class="text-sm text-blue-600 hover:text-blue-800 font-semibold transition-all hover:translate-x-1">View all →</a>
             </div>
             <div class="space-y-3 max-h-96 overflow-y-auto pr-2">
                 @forelse($recentDowntimeErps as $index => $downtimeItem)
@@ -427,7 +453,7 @@
                         <div class="flex-1">
                             <div class="flex items-center gap-3 mb-2">
                                 <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-bold">{{ $index + 1 }}</span>
-                                @if($dataSource === 'downtime_erp')
+                                @if($dataSource === 'downtime_erp2' || $dataSource === 'downtime_erp')
                                     <p class="text-lg font-bold text-gray-900">{{ $downtimeItem->idMachine ?? 'N/A' }}</p>
                                     <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">{{ $downtimeItem->typeMachine ?? 'N/A' }}</span>
                                 @else
@@ -436,7 +462,7 @@
                                 @endif
                             </div>
                             <div class="flex items-center gap-4 mt-2 flex-wrap">
-                                @if($dataSource === 'downtime_erp')
+                                @if($dataSource === 'downtime_erp2' || $dataSource === 'downtime_erp')
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                         🏭 {{ $downtimeItem->plant ?? 'N/A' }}
                                 </span>
@@ -475,7 +501,7 @@
                         </div>
                         <div class="text-right ml-4">
                             <p class="text-xs text-gray-500 mb-1">{{ $downtimeItem->date ? \Carbon\Carbon::parse($downtimeItem->date)->format('M d, Y') : 'N/A' }}</p>
-                            <p class="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent">{{ number_format($downtimeItem->duration ?? 0, 1) }}</p>
+                            <p class="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent">{{ number_format((float)($downtimeItem->duration ?? 0), 1) }}</p>
                             <p class="text-xs text-gray-600">minutes</p>
                         </div>
                     </div>

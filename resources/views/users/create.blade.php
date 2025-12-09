@@ -111,9 +111,11 @@
                         <input type="password" 
                                name="password" 
                                id="password" 
+                               value="{{ old('password', '12345678') }}"
                                class="w-full border rounded px-3 py-2 @error('password') border-red-500 @enderror" 
                                minlength="6"
                                required>
+                        <p class="text-xs text-gray-500 mt-1">Password standar: 12345678 (dapat diedit)</p>
                         @error('password')
                             <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                         @enderror
@@ -288,18 +290,18 @@ function generateEmailFromName(name) {
     // Get first word (first name)
     const firstName = words[0].toLowerCase();
     
-    // Get first letter of second word (last name initial)
+    // Get first letter of second word (last name initial) if exists
     let emailPrefix = firstName;
     if (words.length > 1) {
         const lastNameInitial = words[1].charAt(0).toLowerCase();
-        emailPrefix = firstName + lastNameInitial;
+        emailPrefix = firstName + '.' + lastNameInitial;
     }
     
-    // Remove special characters and spaces
-    emailPrefix = emailPrefix.replace(/[^a-z0-9]/g, '');
+    // Remove special characters and spaces, keep dots
+    emailPrefix = emailPrefix.replace(/[^a-z0-9.]/g, '');
     
     // Return email with domain
-    return emailPrefix + '@pai.pratama.net';
+    return emailPrefix + '@tpmcmms.id';
 }
 
 // Auto-fill email when name changes
@@ -343,6 +345,12 @@ document.addEventListener('DOMContentLoaded', function() {
             emailInput.value = generatedEmail;
             lastGeneratedEmail = generatedEmail;
         }
+    }
+    
+    // Auto-fill password on page load if empty
+    const passwordInput = document.getElementById('password');
+    if (passwordInput && !passwordInput.value) {
+        passwordInput.value = '12345678';
     }
 });
 </script>

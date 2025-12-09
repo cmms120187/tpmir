@@ -19,6 +19,7 @@ use App\Models\Reason;
 use App\Models\Action;
 use App\Models\Downtime;
 use App\Models\DowntimeErp;
+use App\Models\DowntimeErp2;
 use App\Models\User;
 use App\Models\PreventiveMaintenanceSchedule;
 use App\Models\PreventiveMaintenanceExecution;
@@ -32,16 +33,34 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        // Get data source from request or session, default to 'downtime'
-        $dataSource = $request->input('data_source', session('dashboard_data_source', 'downtime'));
+        // Get data source from request or session, default to 'downtime_erp2'
+        $dataSource = $request->input('data_source', session('dashboard_data_source', 'downtime_erp2'));
         session(['dashboard_data_source' => $dataSource]);
         
-        $currentMonth = now()->month;
-        $currentYear = now()->year;
+        // Get filter parameters (default: current month and year)
+        // Priority: query parameter > session > current month/year
+        $filterMonth = $request->get('month', session('dashboard_filter_month', now()->month));
+        $filterYear = $request->get('year', session('dashboard_filter_year', now()->year));
+        
+        // Validate month and year
+        $filterMonth = max(1, min(12, (int)$filterMonth));
+        $filterYear = max(2000, min(2100, (int)$filterYear));
+        
+        // Save filter to session for persistence
+        session([
+            'dashboard_filter_month' => $filterMonth,
+            'dashboard_filter_year' => $filterYear,
+        ]);
+        
+        $currentMonth = $filterMonth;
+        $currentYear = $filterYear;
         
         // ========== THIS MONTH STATISTICS ==========
         
-        if ($dataSource === 'downtime_erp') {
+        if ($dataSource === 'downtime_erp2') {
+            // Use DowntimeErp2 model
+            $stats = $this->getDowntimeErp2Stats($currentYear, $currentMonth);
+        } elseif ($dataSource === 'downtime_erp') {
             // Use DowntimeErp model
             $stats = $this->getDowntimeErpStats($currentYear, $currentMonth);
         } else {
@@ -107,18 +126,27 @@ class DashboardController extends Controller
 
         // ========== MACHINES STATISTICS ==========
         $totalMachines = Machine::count();
-        $machinesWithDowntime = $dataSource === 'downtime_erp' 
-            ? DowntimeErp::whereYear('date', $currentYear)
+        if ($dataSource === 'downtime_erp2') {
+            $machinesWithDowntime = DowntimeErp2::whereYear('date', $currentYear)
                 ->whereMonth('date', $currentMonth)
                 ->whereNotNull('idMachine')
                 ->where('idMachine', '!=', '')
                 ->distinct('idMachine')
-                ->count('idMachine')
-            : Downtime::whereYear('date', $currentYear)
+                ->count('idMachine');
+        } elseif ($dataSource === 'downtime_erp') {
+            $machinesWithDowntime = DowntimeErp::whereYear('date', $currentYear)
+                ->whereMonth('date', $currentMonth)
+                ->whereNotNull('idMachine')
+                ->where('idMachine', '!=', '')
+                ->distinct('idMachine')
+                ->count('idMachine');
+        } else {
+            $machinesWithDowntime = Downtime::whereYear('date', $currentYear)
                 ->whereMonth('date', $currentMonth)
                 ->whereNotNull('machine_id')
                 ->distinct('machine_id')
                 ->count('machine_id');
+        }
         
         $machinesWithPM = PreventiveMaintenanceSchedule::whereYear('start_date', $currentYear)
             ->whereMonth('start_date', $currentMonth)
@@ -130,7 +158,19 @@ class DashboardController extends Controller
         $totalMechanics = User::whereIn('role', ['mekanik', 'team_leader', 'group_leader'])->count();
         
         // Active mechanics are those who have downtime records this month
-        if ($dataSource === 'downtime_erp') {
+        if ($dataSource === 'downtime_erp2') {
+            $activeMechanicNames = DowntimeErp2::whereYear('date', $currentYear)
+                ->whereMonth('date', $currentMonth)
+                ->whereNotNull('nameMekanik')
+                ->where('nameMekanik', '!=', '')
+                ->distinct()
+                ->pluck('nameMekanik')
+                ->toArray();
+            
+            $activeMechanics = User::whereIn('role', ['mekanik', 'team_leader', 'group_leader'])
+                ->whereIn('name', $activeMechanicNames)
+                ->count();
+        } elseif ($dataSource === 'downtime_erp') {
             $activeMechanicNames = DowntimeErp::whereYear('date', $currentYear)
                 ->whereMonth('date', $currentMonth)
                 ->whereNotNull('nameMekanik')
@@ -160,11 +200,16 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        // Calculate days in the selected month
+        $daysInMonth = \Carbon\Carbon::create($currentYear, $currentMonth, 1)->daysInMonth;
+        
         return view('dashboard', array_merge($stats, [
             'dataSource' => $dataSource,
             'currentMonth' => $currentMonth,
             'currentYear' => $currentYear,
-            'daysInMonth' => now()->daysInMonth,
+            'filterMonth' => $filterMonth,
+            'filterYear' => $filterYear,
+            'daysInMonth' => $daysInMonth,
             // PM Stats
             'pmSchedulesThisMonth' => $pmSchedulesThisMonth,
             'pmSchedulesPending' => $pmSchedulesPending,
@@ -219,7 +264,7 @@ class DashboardController extends Controller
         $avgDowntimeDuration = $monthDowntimeCount > 0 ? $monthDowntime / $monthDowntimeCount : 0;
         
         // Average downtime per day (total duration / days in month)
-        $daysInMonth = now()->daysInMonth;
+        $daysInMonth = \Carbon\Carbon::create($currentYear, $currentMonth, 1)->daysInMonth;
         $avgDowntimePerDay = $monthDowntime / $daysInMonth;
         
         // Most problematic machine (by total duration)
@@ -376,6 +421,184 @@ class DashboardController extends Controller
     }
     
     /**
+     * Get statistics from DowntimeErp2 table
+     */
+    private function getDowntimeErp2Stats($currentYear, $currentMonth)
+    {
+        // Total downtime count this month
+        $monthDowntimeCount = DowntimeErp2::whereYear('date', $currentYear)
+            ->whereMonth('date', $currentMonth)
+            ->count();
+        
+        // Total downtime duration this month
+        $monthDowntime = DowntimeErp2::whereYear('date', $currentYear)
+            ->whereMonth('date', $currentMonth)
+            ->get()
+            ->sum(function($item) {
+                return (float) ($item->duration ?? 0);
+            });
+        
+        // Average downtime duration per incident
+        $avgDowntimeDuration = $monthDowntimeCount > 0 ? $monthDowntime / $monthDowntimeCount : 0;
+        
+        // Average downtime per day (total duration / days in month)
+        $daysInMonth = \Carbon\Carbon::create($currentYear, $currentMonth, 1)->daysInMonth;
+        $avgDowntimePerDay = $monthDowntime / $daysInMonth;
+        
+        // Most problematic machine (by total duration)
+        $mostProblematicMachine = DowntimeErp2::select(
+                'idMachine',
+                DB::raw('MAX(typeMachine) as typeMachine'),
+                DB::raw('SUM(CAST(duration AS DECIMAL(10,2))) as total_duration'),
+                DB::raw('COUNT(*) as downtime_count')
+            )
+            ->whereNotNull('idMachine')
+            ->where('idMachine', '!=', '')
+            ->whereYear('date', $currentYear)
+            ->whereMonth('date', $currentMonth)
+            ->groupBy('idMachine')
+            ->orderBy('total_duration', 'desc')
+            ->first();
+        
+        // Longest single downtime this month
+        $longestDowntime = DowntimeErp2::whereYear('date', $currentYear)
+            ->whereMonth('date', $currentMonth)
+            ->orderByRaw('CAST(duration AS DECIMAL(10,2)) DESC')
+            ->first();
+        
+        // Top 10 Machine dengan Akumulasi Downtime Tertinggi (This Month)
+        $topMachines = DowntimeErp2::select(
+                'idMachine',
+                DB::raw('MAX(typeMachine) as typeMachine'),
+                DB::raw('SUM(CAST(duration AS DECIMAL(10,2))) as total_duration'),
+                DB::raw('COUNT(*) as downtime_count')
+            )
+            ->whereNotNull('idMachine')
+            ->where('idMachine', '!=', '')
+            ->whereYear('date', $currentYear)
+            ->whereMonth('date', $currentMonth)
+            ->groupBy('idMachine')
+            ->orderBy('total_duration', 'desc')
+            ->limit(10)
+            ->get();
+
+        // Top 5 MTTR (Mean Time To Repair) Tertinggi (This Month)
+        $topMTTR = DowntimeErp2::select(
+                'idMachine',
+                DB::raw('MAX(typeMachine) as typeMachine'),
+                DB::raw('SUM(CAST(duration AS DECIMAL(10,2))) as total_duration'),
+                DB::raw('COUNT(*) as downtime_count'),
+                DB::raw('SUM(CAST(duration AS DECIMAL(10,2))) / COUNT(*) as mttr')
+            )
+            ->whereNotNull('idMachine')
+            ->where('idMachine', '!=', '')
+            ->whereYear('date', $currentYear)
+            ->whereMonth('date', $currentMonth)
+            ->havingRaw('COUNT(*) > 0')
+            ->groupBy('idMachine')
+            ->orderBy('mttr', 'desc')
+            ->limit(5)
+            ->get();
+
+        // Top 5 Plant dengan Akumulasi Downtime Tertinggi (This Month)
+        $topPlants = DowntimeErp2::select(
+                'plant',
+                DB::raw('SUM(CAST(duration AS DECIMAL(10,2))) as total_duration'),
+                DB::raw('COUNT(*) as downtime_count')
+            )
+            ->whereNotNull('plant')
+            ->where('plant', '!=', '')
+            ->whereYear('date', $currentYear)
+            ->whereMonth('date', $currentMonth)
+            ->groupBy('plant')
+            ->orderBy('total_duration', 'desc')
+            ->limit(5)
+            ->get();
+        
+        // Top 5 Most Common Problems (This Month)
+        $topProblems = DowntimeErp2::select(
+                'problemDowntime',
+                DB::raw('COUNT(*) as problem_count'),
+                DB::raw('SUM(CAST(duration AS DECIMAL(10,2))) as total_duration')
+            )
+            ->whereNotNull('problemDowntime')
+            ->where('problemDowntime', '!=', '')
+            ->whereYear('date', $currentYear)
+            ->whereMonth('date', $currentMonth)
+            ->groupBy('problemDowntime')
+            ->orderBy('problem_count', 'desc')
+            ->limit(5)
+            ->get();
+
+        // Top 5 Most Active Mekanik (This Month)
+        $topMekanik = DowntimeErp2::select(
+                'nameMekanik',
+                DB::raw('COUNT(*) as downtime_count'),
+                DB::raw('SUM(CAST(duration AS DECIMAL(10,2))) as total_duration')
+            )
+            ->whereNotNull('nameMekanik')
+            ->where('nameMekanik', '!=', '')
+            ->whereYear('date', $currentYear)
+            ->whereMonth('date', $currentMonth)
+            ->groupBy('nameMekanik')
+            ->orderBy('downtime_count', 'desc')
+            ->limit(5)
+            ->get();
+
+        // Top 5 Lines with Most Downtime (This Month)
+        $topLines = DowntimeErp2::select(
+                'line',
+                DB::raw('SUM(CAST(duration AS DECIMAL(10,2))) as total_duration'),
+                DB::raw('COUNT(*) as downtime_count')
+            )
+            ->whereNotNull('line')
+            ->where('line', '!=', '')
+            ->whereYear('date', $currentYear)
+            ->whereMonth('date', $currentMonth)
+            ->groupBy('line')
+            ->orderBy('total_duration', 'desc')
+            ->limit(5)
+            ->get();
+
+        // Downtime Trend per Day (This Month)
+        $downtimeTrend = DowntimeErp2::select(
+                DB::raw('DATE(date) as date'),
+                DB::raw('COUNT(*) as count'),
+                DB::raw('SUM(CAST(duration AS DECIMAL(10,2))) as total_duration')
+            )
+            ->whereYear('date', $currentYear)
+            ->whereMonth('date', $currentMonth)
+            ->groupBy(DB::raw('DATE(date)'))
+            ->orderBy('date', 'asc')
+            ->get();
+        
+        // Recent Downtime ERP2s (10 terakhir) - This Month
+        $recentDowntimeErps = DowntimeErp2::whereYear('date', $currentYear)
+            ->whereMonth('date', $currentMonth)
+            ->orderBy('date', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get();
+        
+        return [
+            'monthDowntimeCount' => $monthDowntimeCount,
+            'monthDowntime' => $monthDowntime,
+            'avgDowntimeDuration' => $avgDowntimeDuration,
+            'avgDowntimePerDay' => $avgDowntimePerDay,
+            'mostProblematicMachine' => $mostProblematicMachine,
+            'longestDowntime' => $longestDowntime,
+            'topMachines' => $topMachines,
+            'topMTTR' => $topMTTR,
+            'topPlants' => $topPlants,
+            'topProblems' => $topProblems,
+            'topMekanik' => $topMekanik,
+            'topLines' => $topLines,
+            'downtimeTrend' => $downtimeTrend,
+            'recentDowntimeErps' => $recentDowntimeErps,
+        ];
+    }
+    
+    /**
      * Get statistics from Downtime table
      */
     private function getDowntimeStats($currentYear, $currentMonth)
@@ -394,7 +617,7 @@ class DashboardController extends Controller
         $avgDowntimeDuration = $monthDowntimeCount > 0 ? $monthDowntime / $monthDowntimeCount : 0;
         
         // Average downtime per day (total duration / days in month)
-        $daysInMonth = now()->daysInMonth;
+        $daysInMonth = \Carbon\Carbon::create($currentYear, $currentMonth, 1)->daysInMonth;
         $avgDowntimePerDay = $monthDowntime / $daysInMonth;
         
         // Most problematic machine (by total duration)

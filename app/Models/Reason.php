@@ -6,7 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class Reason extends Model
 {
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'system_id', 'problem_id'];
+    
+    public function system()
+    {
+        return $this->belongsTo(System::class);
+    }
+    
+    public function problem()
+    {
+        return $this->belongsTo(Problem::class);
+    }
 
     public function downtimes()
     {

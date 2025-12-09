@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\WorkOrder;
 use App\Models\Machine;
+use App\Models\MachineErp;
 use App\Models\User;
+use App\Models\PartErp;
 use App\Helpers\DataFilterHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -71,10 +73,36 @@ class WorkOrderController extends Controller
      */
     public function create()
     {
+        // Get machines from MachineErp for suggestion/search
+        $machineErps = MachineErp::orderBy('idMachine')->get();
+        // Also get Machine for dropdown (if needed for form submission)
         $machines = Machine::with(['plant', 'process', 'line', 'room', 'machineType'])->orderBy('idMachine')->get();
         $users = User::whereIn('role', ['mekanik', 'team_leader', 'group_leader', 'coordinator'])->orderBy('name')->get();
+        $parts = PartErp::orderBy('name')->get();
         
-        return view('work-orders.create', compact('machines', 'users'));
+        // Map MachineErp data for JavaScript suggestion/search
+        $machinesArray = $machineErps->map(function($machineErp) {
+            return [
+                'idMachine' => $machineErp->idMachine,
+                'type_name' => $machineErp->type_name ?? '-',
+                'plant_name' => $machineErp->plant_name ?? '-',
+                'process_name' => $machineErp->process_name ?? '-',
+                'line_name' => $machineErp->line_name ?? '-',
+                'room_name' => $machineErp->room_name ?? '-',
+                // Get Machine ID if exists (for form submission)
+                'machine_id' => Machine::where('idMachine', $machineErp->idMachine)->value('id') ?? null,
+            ];
+        })->toArray();
+        
+        $partsArray = $parts->map(function($part) {
+            return [
+                'id' => $part->id,
+                'name' => $part->name,
+                'part_number' => $part->part_number ?? '-',
+            ];
+        })->toArray();
+        
+        return view('work-orders.create', compact('machines', 'users', 'parts', 'machinesArray', 'partsArray'));
     }
 
     /**
@@ -84,8 +112,9 @@ class WorkOrderController extends Controller
     {
         $validated = $request->validate([
             'order_date' => 'required|date',
+            'status' => 'nullable|in:pending,waiting_parts,order_parts,in_progress,completed,cancelled',
             'priority' => 'required|in:low,medium,high,urgent',
-            'machine_id' => 'required|exists:machines,id',
+            'machine_id' => 'required',
             'description' => 'required|string',
             'problem_description' => 'nullable|string',
             'assigned_to' => 'nullable|exists:users,id',
@@ -96,6 +125,21 @@ class WorkOrderController extends Controller
             'photo_before' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
+        // Handle machine_id - if it's idMachine string, find the Machine
+        if (!is_numeric($validated['machine_id'])) {
+            // It's an idMachine string, find the Machine
+            $machine = Machine::where('idMachine', $validated['machine_id'])->first();
+            if (!$machine) {
+                return redirect()->back()->withInput()->withErrors(['machine_id' => 'Machine dengan ID tersebut belum terdaftar di sistem Machine. Silakan daftarkan terlebih dahulu.']);
+            }
+            $validated['machine_id'] = $machine->id;
+        } else {
+            // Validate that machine exists
+            if (!Machine::where('id', $validated['machine_id'])->exists()) {
+                return redirect()->back()->withInput()->withErrors(['machine_id' => 'Machine tidak ditemukan.']);
+            }
+        }
+
         // Generate WO Number
         $woNumber = $this->generateWoNumber();
 
@@ -105,7 +149,7 @@ class WorkOrderController extends Controller
         }
 
         $validated['wo_number'] = $woNumber;
-        $validated['status'] = 'pending';
+        $validated['status'] = $validated['status'] ?? 'pending';
         $validated['created_by'] = auth()->id();
 
         WorkOrder::create($validated);
@@ -144,7 +188,7 @@ class WorkOrderController extends Controller
 
         $validated = $request->validate([
             'order_date' => 'required|date',
-            'status' => 'required|in:pending,in_progress,completed,cancelled',
+            'status' => 'required|in:pending,waiting_parts,order_parts,in_progress,completed,cancelled',
             'priority' => 'required|in:low,medium,high,urgent',
             'machine_id' => 'required|exists:machines,id',
             'description' => 'required|string',

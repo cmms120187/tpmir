@@ -325,7 +325,7 @@
                         @if($workOrder->photo_before)
                             <div class="mb-2">
                                 <p class="text-xs text-gray-500 mb-2">Current photo:</p>
-                                <img src="{{ asset('storage/' . $workOrder->photo_before) }}" alt="Photo Before" class="w-32 h-32 object-cover rounded border-2 border-gray-300" id="current_photo_before">
+                                <img src="{{ asset('public-storage/' . $workOrder->photo_before) }}" alt="Photo Before" class="w-32 h-32 object-cover rounded border-2 border-gray-300" id="current_photo_before" onerror="this.style.display='none'">
                             </div>
                         @endif
                         <input type="file"
@@ -351,7 +351,7 @@
                         @if($workOrder->photo_after)
                             <div class="mb-2">
                                 <p class="text-xs text-gray-500 mb-2">Current photo:</p>
-                                <img src="{{ asset('storage/' . $workOrder->photo_after) }}" alt="Photo After" class="w-32 h-32 object-cover rounded border-2 border-gray-300" id="current_photo_after">
+                                <img src="{{ asset('public-storage/' . $workOrder->photo_after) }}" alt="Photo After" class="w-32 h-32 object-cover rounded border-2 border-gray-300" id="current_photo_after" onerror="this.style.display='none'">
                             </div>
                         @endif
                         <input type="file"

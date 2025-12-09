@@ -8,6 +8,12 @@ use App\Models\MachineErp;
 use App\Models\RoomErp;
 use App\Models\User;
 use App\Models\Group;
+use App\Models\System;
+use App\Models\Problem;
+use App\Models\Reason;
+use App\Models\Action;
+use App\Models\Part;
+use App\Models\PartErp;
 use App\Helpers\DataFilterHelper;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -68,12 +74,20 @@ class DowntimeErp2Controller extends Controller
             ];
         }
         
-        // Get all machine ERP for auto-complete
-        $machinesQuery = MachineErp::orderBy('idMachine', 'asc')->get();
+        // Get all machine ERP for auto-complete (with machine type and systems)
+        $machinesQuery = MachineErp::with('machineType.systems')->orderBy('idMachine', 'asc')->get();
         
-        // Map machines data for JavaScript
+        // Map machines data for JavaScript (with system IDs from machine type)
         $machines = [];
         foreach ($machinesQuery as $machine) {
+            // Get system IDs from machine type
+            $systemIds = [];
+            if ($machine->machineType && $machine->machineType->systems) {
+                $systemIds = $machine->machineType->systems->pluck('id')->map(function($id) {
+                    return (string)$id;
+                })->toArray();
+            }
+            
             $machines[] = [
                 'id' => (string)$machine->id,
                 'idMachine' => $machine->idMachine ?? '',
@@ -85,10 +99,87 @@ class DowntimeErp2Controller extends Controller
                 'line' => $machine->line_name ?? '',
                 'roomName' => $machine->room_name ?? '',
                 'kodeRoom' => $machine->kode_room ?? '',
+                'system_ids' => $systemIds, // System IDs from machine type
             ];
         }
         
-        return view('downtime_erp2.create', compact('mekaniks', 'machines'));
+        // Get all systems for dropdown
+        $systemsQuery = System::orderBy('nama_sistem', 'asc')->get();
+        
+        // Get all problems with their systems for client-side filtering
+        $problemsQuery = Problem::with('systems')->orderBy('problem_header', 'asc')->orderBy('name', 'asc')->get();
+        
+        // Map systems data for JavaScript
+        $systems = [];
+        foreach ($systemsQuery as $system) {
+            $systems[] = [
+                'id' => (string)$system->id,
+                'nama_sistem' => $system->nama_sistem ?? '',
+            ];
+        }
+        
+        // Map problems data with their system IDs for JavaScript
+        $problems = [];
+        foreach ($problemsQuery as $problem) {
+            $systemIds = $problem->systems->pluck('id')->map(function($id) {
+                return (string)$id;
+            })->toArray();
+            
+            $problems[] = [
+                'id' => (string)$problem->id,
+                'name' => $problem->name ?? '',
+                'problem_header' => $problem->problem_header ?? '',
+                'problem_mm' => $problem->problem_mm ?? '',
+                'system_ids' => $systemIds,
+            ];
+        }
+        
+        // Get all reasons for dropdown
+        $reasonsQuery = Reason::orderBy('name', 'asc')->get();
+        
+        // Get all actions with relationships for dropdown and autocomplete
+        $actionsQuery = Action::with(['system', 'problem', 'reason'])->orderBy('name', 'asc')->get();
+        
+        // Map reasons data for JavaScript
+        $reasons = [];
+        foreach ($reasonsQuery as $reason) {
+            $reasons[] = [
+                'id' => (string)$reason->id,
+                'name' => $reason->name ?? '',
+            ];
+        }
+        
+        // Map actions data for JavaScript (with system, problem, reason info)
+        $actions = [];
+        foreach ($actionsQuery as $action) {
+            $actions[] = [
+                'id' => (string)$action->id,
+                'name' => $action->name ?? '',
+                'system_id' => $action->system_id ? (string)$action->system_id : null,
+                'system_name' => $action->system ? $action->system->nama_sistem : '',
+                'problem_id' => $action->problem_id ? (string)$action->problem_id : null,
+                'problem_name' => $action->problem ? $action->problem->name : '',
+                'problem_header' => $action->problem ? $action->problem->problem_header : '',
+                'reason_id' => $action->reason_id ? (string)$action->reason_id : null,
+                'reason_name' => $action->reason ? $action->reason->name : '',
+            ];
+        }
+        
+        // Get all parts from PartErp (category stores nama_sistem)
+        $partsQuery = PartErp::orderBy('name', 'asc')->get();
+        
+        // Map parts data with their category (nama_sistem) for JavaScript
+        $parts = [];
+        foreach ($partsQuery as $part) {
+            $parts[] = [
+                'id' => (string)$part->id,
+                'name' => $part->name ?? '',
+                'description' => $part->description ?? '', // description is used as specification
+                'category' => $part->category ?? '', // category stores nama_sistem
+            ];
+        }
+        
+        return view('downtime_erp2.create', compact('mekaniks', 'machines', 'systems', 'problems', 'reasons', 'actions', 'parts'));
     }
 
     /**
@@ -114,6 +205,10 @@ class DowntimeErp2Controller extends Controller
             'Standar_Time' => 'nullable|string|max:255',
             'problemDowntime' => 'required|string|max:255',
             'Problem_MM' => 'nullable|string|max:255',
+            'system_select' => 'nullable|exists:systems,id', // Only for filtering, not stored
+            'problem_select' => 'nullable|exists:problems,id', // Only for filtering, not stored
+            'reason_select' => 'nullable|exists:reasons,id', // Only for filtering, not stored
+            'action_select' => 'nullable|exists:actions,id', // Only for filtering, not stored
             'reasonDowntime' => 'required|string|max:255',
             'actionDowtime' => 'required|string|max:255',
             'Part' => 'nullable|string|max:255',
@@ -125,12 +220,24 @@ class DowntimeErp2Controller extends Controller
             'nameGL' => 'nullable|string|max:255',
             'idCoord' => 'required|string|max:255',
             'nameCoord' => 'required|string|max:255',
-            'groupProblem' => 'required|string|max:255',
+            'groupProblem' => 'nullable|string|max:255',
             'include_oee' => 'nullable|boolean',
         ]);
 
         // Handle checkbox (include_oee)
         $validated['include_oee'] = $request->has('include_oee') ? true : false;
+        
+        // Remove system_select, problem_select, reason_select, action_select, and part_select from validated data (they are only for filtering)
+        unset($validated['system_select']);
+        unset($validated['problem_select']);
+        unset($validated['reason_select']);
+        unset($validated['action_select']);
+        unset($validated['part_select']);
+        
+        // Ensure groupProblem is null if empty or not set
+        if (!isset($validated['groupProblem']) || $validated['groupProblem'] === '' || trim($validated['groupProblem']) === '') {
+            $validated['groupProblem'] = null;
+        }
 
         // Combine date with time fields (stopProduction, responMechanic, startProduction)
         $date = $validated['date'];
@@ -144,7 +251,7 @@ class DowntimeErp2Controller extends Controller
         $validated['stopProduction'] = $date . ' ' . $stopTime;
         $validated['responMechanic'] = $date . ' ' . $responTime;
         $validated['startProduction'] = $date . ' ' . $startTime;
-
+        
         DowntimeErp2::create($validated);
         return redirect()->route('downtime-erp2.index')->with('success', 'Downtime ERP2 created successfully.');
     }
@@ -254,7 +361,10 @@ class DowntimeErp2Controller extends Controller
             ];
         }
         
-        return view('downtime_erp2.edit', compact('downtimeErp2', 'stopTime', 'responTime', 'startTime', 'mekaniks', 'groups', 'groupsData', 'page'));
+        // Get all Room ERP for location dropdown
+        $roomErps = RoomErp::orderBy('name', 'asc')->get();
+        
+        return view('downtime_erp2.edit', compact('downtimeErp2', 'stopTime', 'responTime', 'startTime', 'mekaniks', 'groups', 'groupsData', 'roomErps', 'page'));
     }
     
     /**
@@ -328,12 +438,18 @@ class DowntimeErp2Controller extends Controller
             'nameGL' => 'nullable|string|max:255',
             'idCoord' => 'required|string|max:255',
             'nameCoord' => 'required|string|max:255',
-            'groupProblem' => 'required|string|max:255',
+            'groupProblem' => 'nullable|string|max:255',
+            'system_select' => 'nullable|exists:systems,id', // Only for filtering, not stored
+            'problem_select' => 'nullable|exists:problems,id', // Only for filtering, not stored
             'include_oee' => 'nullable|boolean',
         ]);
 
         // Handle checkbox (include_oee)
         $validated['include_oee'] = $request->has('include_oee') ? true : false;
+        
+        // Remove system_select and problem_select from validated data (they are only for filtering)
+        unset($validated['system_select']);
+        unset($validated['problem_select']);
 
         // Combine date with time fields (stopProduction, responMechanic, startProduction)
         $date = $validated['date'];

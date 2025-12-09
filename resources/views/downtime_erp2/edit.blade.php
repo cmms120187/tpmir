@@ -23,6 +23,36 @@
             <!-- Basic Information -->
             <div class="mb-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">Basic Information</h3>
+                
+                <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <label for="room_erp_select" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Pilih Room ERP (untuk auto-fill Plant/Process/Line/Room)
+                    </label>
+                    <select id="room_erp_select" 
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <option value="">-- Pilih Room ERP atau isi manual --</option>
+                        @foreach($roomErps as $roomErp)
+                            <option value="{{ $roomErp->id }}" 
+                                    data-plant="{{ $roomErp->plant_name ?? '' }}"
+                                    data-process="{{ $roomErp->process_name ?? '' }}"
+                                    data-line="{{ $roomErp->line_name ?? '' }}"
+                                    data-room="{{ $roomErp->name ?? '' }}"
+                                    data-kode-room="{{ $roomErp->kode_room ?? '' }}"
+                                    {{ old('room_erp_id') == $roomErp->id || 
+                                       ($downtimeErp2->plant == $roomErp->plant_name && 
+                                        $downtimeErp2->process == $roomErp->process_name && 
+                                        $downtimeErp2->line == $roomErp->line_name && 
+                                        $downtimeErp2->roomName == $roomErp->name) ? 'selected' : '' }}>
+                                {{ $roomErp->kode_room ? $roomErp->kode_room . ' - ' : '' }}{{ $roomErp->name }}
+                                @if($roomErp->plant_name)
+                                    ({{ $roomErp->plant_name }})
+                                @endif
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Pilih room untuk mengisi otomatis field Plant, Process, Line, dan Room Name</p>
+                </div>
+                
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label for="date" class="block text-sm font-semibold text-gray-700 mb-2">Date <span class="text-red-500">*</span></label>
@@ -50,6 +80,9 @@
                         @error('roomName')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
                     </div>
                 </div>
+                
+                <!-- Hidden field for kode_room -->
+                <input type="hidden" name="kode_room" id="kode_room" value="{{ old('kode_room', $downtimeErp2->kode_room) }}">
                 <div class="mt-4">
                     <label class="flex items-center">
                         <input type="checkbox" 
@@ -274,6 +307,35 @@
 </div>
 
 <script>
+// Room ERP selection handler
+const roomErpSelect = document.getElementById('room_erp_select');
+const plantInput = document.getElementById('plant');
+const processInput = document.getElementById('process');
+const lineInput = document.getElementById('line');
+const roomNameInput = document.getElementById('roomName');
+const kodeRoomInput = document.getElementById('kode_room');
+
+// Handle Room ERP selection change
+if (roomErpSelect && plantInput && processInput && lineInput && roomNameInput && kodeRoomInput) {
+    roomErpSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        if (selectedOption.value) {
+            plantInput.value = selectedOption.dataset.plant || '';
+            processInput.value = selectedOption.dataset.process || '';
+            lineInput.value = selectedOption.dataset.line || '';
+            roomNameInput.value = selectedOption.dataset.room || '';
+            kodeRoomInput.value = selectedOption.dataset.kodeRoom || '';
+        } else {
+            // Clear fields if no selection
+            plantInput.value = '';
+            processInput.value = '';
+            lineInput.value = '';
+            roomNameInput.value = '';
+            kodeRoomInput.value = '';
+        }
+    });
+}
+
 // Mekanik data from server (already mapped in controller)
 const mekaniks = @json($mekaniks);
 

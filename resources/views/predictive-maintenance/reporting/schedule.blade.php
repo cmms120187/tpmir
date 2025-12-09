@@ -76,9 +76,8 @@
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Machine</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Schedule Date</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Standard</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Assigned To</th>
-                                <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase">Points Count</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Data Hasil Input Point</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">PIC</th>
                                 <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase">Actions</th>
                             </tr>
                         </thead>
@@ -89,8 +88,8 @@
                                     <div class="font-semibold text-gray-900">{{ $jadwal['machine']->idMachine ?? '-' }}</div>
                                     <div class="text-gray-500">{{ $jadwal['machine']->machineType->name ?? '-' }}</div>
                                     <div class="text-xs text-gray-400">
-                                        {{ $jadwal['machine']->room->plant->name ?? '-' }} /
-                                        {{ $jadwal['machine']->room->line->name ?? '-' }}
+                                        {{ $jadwal['machine']->plant_name ?? '-' }} /
+                                        {{ $jadwal['machine']->line_name ?? '-' }}
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-sm">
@@ -99,17 +98,81 @@
                                         {{ \Carbon\Carbon::parse($jadwal['start_date'])->format('d/m/Y') }}
                                     </button>
                                 </td>
-                                <td class="px-4 py-3 text-sm text-gray-500">
+                                <td class="px-4 py-3 text-sm">
                                     @php
-                                        $firstSchedule = $jadwal['schedules'][0] ?? null;
+                                        // Get all executions for this schedule date
+                                        $executions = $jadwal['executions'] ?? [];
+                                        $pointResults = [];
+                                        
+                                        foreach ($jadwal['schedules'] as $schedule) {
+                                            $pointName = $schedule->maintenancePoint->name ?? $schedule->title ?? 'Unknown Point';
+                                            $unit = $schedule->standard->unit ?? '';
+                                            
+                                            // Find execution for this schedule
+                                            $execution = collect($executions)->firstWhere('schedule_id', $schedule->id);
+                                            
+                                            if ($execution && $execution->measured_value !== null) {
+                                                $value = number_format((float)$execution->measured_value, 2, '.', '');
+                                                $status = $execution->measurement_status ?? 'normal';
+                                                
+                                                // Determine color based on measurement_status
+                                                $bgColor = 'bg-gray-100';
+                                                $textColor = 'text-gray-800';
+                                                if ($status == 'normal') {
+                                                    $bgColor = 'bg-green-100';
+                                                    $textColor = 'text-green-800';
+                                                } elseif ($status == 'warning') {
+                                                    $bgColor = 'bg-yellow-100';
+                                                    $textColor = 'text-yellow-800';
+                                                } elseif ($status == 'critical' || $status == 'caution') {
+                                                    $bgColor = 'bg-red-100';
+                                                    $textColor = 'text-red-800';
+                                                }
+                                                
+                                                $pointResults[] = [
+                                                    'point_name' => $pointName,
+                                                    'value' => $value,
+                                                    'unit' => $unit,
+                                                    'status' => $status,
+                                                    'bg_color' => $bgColor,
+                                                    'text_color' => $textColor,
+                                                ];
+                                            } else {
+                                                // No execution data yet
+                                                $pointResults[] = [
+                                                    'point_name' => $pointName,
+                                                    'value' => null,
+                                                    'unit' => $unit,
+                                                    'status' => null,
+                                                    'bg_color' => 'bg-gray-100',
+                                                    'text_color' => 'text-gray-500',
+                                                ];
+                                            }
+                                        }
                                     @endphp
-                                    @if($firstSchedule && $firstSchedule->standard)
-                                        <div class="font-semibold">{{ $firstSchedule->standard->name }}</div>
-                                        <div class="text-xs text-gray-400">
-                                            {{ $firstSchedule->standard->min_value ?? '-' }} - {{ $firstSchedule->standard->max_value ?? '-' }} {{ $firstSchedule->standard->unit ?? '' }}
+                                    
+                                    @if(count($pointResults) > 0)
+                                        <div class="space-y-2">
+                                            @foreach($pointResults as $result)
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-xs font-medium text-gray-700 w-32 truncate">{{ $result['point_name'] }}:</span>
+                                                    @if($result['value'] !== null)
+                                                        <span class="px-2 py-1 rounded text-xs font-semibold {{ $result['bg_color'] }} {{ $result['text_color'] }}">
+                                                            {{ $result['value'] }} {{ $result['unit'] }}
+                                                            @if($result['status'])
+                                                                <span class="ml-1">({{ ucfirst($result['status']) }})</span>
+                                                            @endif
+                                                        </span>
+                                                    @else
+                                                        <span class="px-2 py-1 rounded text-xs {{ $result['bg_color'] }} {{ $result['text_color'] }}">
+                                                            Belum diinput
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            @endforeach
                                         </div>
                                     @else
-                                        -
+                                        <span class="text-gray-400">Tidak ada data</span>
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-500">
@@ -121,9 +184,6 @@
                                     @else
                                         -
                                     @endif
-                                </td>
-                                <td class="px-4 py-3 text-sm text-center text-gray-500">
-                                    {{ count($jadwal['schedules']) }} point(s)
                                 </td>
                                 <td class="px-4 py-3 text-center">
                                     <button onclick="showSchedulePoints({{ $jadwal['machine_id'] }}, '{{ $jadwal['start_date'] }}')"

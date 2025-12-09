@@ -243,7 +243,7 @@ class SchedulingController extends Controller
                     
                     $photoUrl = null;
                     if ($schedule->maintenancePoint && $schedule->maintenancePoint->photo) {
-                        $photoUrl = Storage::url($schedule->maintenancePoint->photo);
+                        $photoUrl = asset('public-storage/' . $schedule->maintenancePoint->photo);
                     }
                     
                     $schedulesDataForJs[$machineId][$key][] = [
@@ -284,11 +284,27 @@ class SchedulingController extends Controller
             ->whereNotIn('id', $machinesWithSchedules)
             ->get();
         
+        // Prepare machines data for JavaScript
+        $machinesForJs = $machines->map(function($machine) {
+            $machineTypeName = ($machine->machineType ? $machine->machineType->name : null) ?? $machine->type_name ?? '-';
+            $roomName = ($machine->roomErp ? $machine->roomErp->name : null) ?? $machine->room_name ?? '-';
+            return [
+                'id' => $machine->id,
+                'idMachine' => $machine->idMachine,
+                'type_id' => $machine->machine_type_id ?? null,
+                'machineType' => $machineTypeName,
+                'plant' => $machine->plant_name ?? '-',
+                'process' => $machine->process_name ?? '-',
+                'line' => $machine->line_name ?? '-',
+                'room' => $roomName,
+            ];
+        })->values();
+        
         $machineTypes = \App\Models\MachineType::orderBy('name')->get();
         $maintenancePoints = MaintenancePoint::with('machineType')->get();
-        $users = User::whereIn('role', ['mekanik', 'team_leader', 'group_leader', 'coordinator'])->get();
+        $users = User::where('role', 'mekanik')->orderBy('name')->get();
         
-        return view('preventive-maintenance.scheduling.create', compact('machines', 'machineTypes', 'maintenancePoints', 'users'));
+        return view('preventive-maintenance.scheduling.create', compact('machines', 'machinesForJs', 'machineTypes', 'maintenancePoints', 'users'));
     }
     
     public function getMachinesByType(Request $request)
@@ -356,7 +372,7 @@ class SchedulingController extends Controller
                     'frequency_type' => $point->frequency_type,
                     'frequency_value' => $point->frequency_value ?? 1,
                     'sequence' => $point->sequence,
-                    'photo' => $point->photo ? \Storage::url($point->photo) : null
+                    'photo' => $point->photo ? asset('public-storage/' . $point->photo) : null
                 ];
             });
             
@@ -543,7 +559,7 @@ class SchedulingController extends Controller
      */
     public function show(string $id)
     {
-        $schedule = PreventiveMaintenanceSchedule::with(['machine', 'maintenancePoint', 'assignedUser', 'executions.performedBy'])
+        $schedule = PreventiveMaintenanceSchedule::with(['machineErp.roomErp', 'machineErp.machineType', 'maintenancePoint', 'assignedUser', 'executions.performedBy'])
             ->findOrFail($id);
         
         return view('preventive-maintenance.scheduling.show', compact('schedule'));
@@ -557,7 +573,7 @@ class SchedulingController extends Controller
         $schedule = PreventiveMaintenanceSchedule::findOrFail($id);
         $machines = MachineErp::with(['roomErp', 'machineType'])->get();
         $maintenancePoints = MaintenancePoint::with('machineType')->get();
-        $users = User::whereIn('role', ['mekanik', 'team_leader', 'group_leader', 'coordinator'])->get();
+        $users = User::where('role', 'mekanik')->orderBy('name')->get();
         
         return view('preventive-maintenance.scheduling.edit', compact('schedule', 'machines', 'maintenancePoints', 'users'));
     }
@@ -635,22 +651,37 @@ class SchedulingController extends Controller
             $schedule = PreventiveMaintenanceSchedule::findOrFail($updateData['schedule_id']);
             
             // Check if execution exists
-            if ($updateData['execution_id']) {
-                // Update existing execution
+            if (isset($updateData['execution_id']) && $updateData['execution_id']) {
+                // Update existing execution by ID
                 $execution = PreventiveMaintenanceExecution::findOrFail($updateData['execution_id']);
                 $execution->update([
                     'status' => $validated['status'],
                 ]);
                 $updatedCount++;
             } else {
-                // Create new execution if it doesn't exist
-                PreventiveMaintenanceExecution::create([
-                    'schedule_id' => $updateData['schedule_id'],
-                    'scheduled_date' => $updateData['scheduled_date'],
-                    'status' => $validated['status'],
-                    'performed_by' => $schedule->assigned_to, // Use PIC from schedule
-                ]);
-                $updatedCount++;
+                // Check if execution already exists for this schedule_id and scheduled_date
+                // 1 jadwal = 1 execution (update existing, don't create duplicate)
+                $existingExecution = PreventiveMaintenanceExecution::where('schedule_id', $updateData['schedule_id'])
+                    ->where('scheduled_date', $updateData['scheduled_date'])
+                    ->first();
+                
+                if ($existingExecution) {
+                    // Update existing execution (same jadwal, just update status)
+                    $existingExecution->update([
+                        'status' => $validated['status'],
+                        'performed_by' => $schedule->assigned_to ?? $existingExecution->performed_by,
+                    ]);
+                    $updatedCount++;
+                } else {
+                    // Create new execution only if doesn't exist
+                    PreventiveMaintenanceExecution::create([
+                        'schedule_id' => $updateData['schedule_id'],
+                        'scheduled_date' => $updateData['scheduled_date'],
+                        'status' => $validated['status'],
+                        'performed_by' => $schedule->assigned_to, // Use PIC from schedule
+                    ]);
+                    $updatedCount++;
+                }
             }
         }
         
@@ -862,6 +893,86 @@ class SchedulingController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan saat memindahkan jadwal: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Update PIC (assigned_to) for schedules on a specific date
+     * Only admin can do this, and only for schedules that are not completed
+     */
+    public function updatePic(Request $request)
+    {
+        // Check if user is admin
+        if (!auth()->user()->isAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hanya admin yang dapat mengubah PIC'
+            ], 403);
+        }
+        
+        $validated = $request->validate([
+            'machine_erp_id' => 'required|exists:machine_erp,id',
+            'scheduled_date' => 'required|date',
+            'assigned_to' => 'nullable|exists:users,id',
+        ]);
+        
+        try {
+            \DB::beginTransaction();
+            
+            // Get all schedules for this machine and date
+            $schedules = PreventiveMaintenanceSchedule::where('machine_erp_id', $validated['machine_erp_id'])
+                ->where('start_date', $validated['scheduled_date'])
+                ->where('status', 'active')
+                ->get();
+            
+            if ($schedules->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak ada schedule ditemukan untuk tanggal ini'
+                ], 404);
+            }
+            
+            $updatedCount = 0;
+            $skippedCount = 0;
+            
+            foreach ($schedules as $schedule) {
+                // Check if schedule has completed execution
+                $hasCompletedExecution = $schedule->executions()
+                    ->where('status', 'completed')
+                    ->exists();
+                
+                // Only update if not completed
+                if (!$hasCompletedExecution) {
+                    $schedule->update([
+                        'assigned_to' => $validated['assigned_to']
+                    ]);
+                    $updatedCount++;
+                } else {
+                    $skippedCount++;
+                }
+            }
+            
+            \DB::commit();
+            
+            $message = "Berhasil mengupdate PIC untuk {$updatedCount} schedule";
+            if ($skippedCount > 0) {
+                $message .= ". {$skippedCount} schedule dilewati karena sudah completed";
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'updated_count' => $updatedCount,
+                'skipped_count' => $skippedCount
+            ]);
+            
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            \Log::error('Error in updatePic', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengupdate PIC: ' . $e->getMessage()
             ], 500);
         }
     }

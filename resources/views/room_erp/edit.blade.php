@@ -64,9 +64,10 @@
                     <input type="text" 
                            name="plant_name" 
                            id="plant_name" 
-                           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('plant_name') border-red-500 @enderror" 
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('plant_name') border-red-500 @enderror" 
                            value="{{ old('plant_name', $roomErp->plant_name) }}" 
-                           placeholder="Enter plant name">
+                           placeholder="Auto-filled from Line"
+                           readonly>
                     @error('plant_name')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                     @enderror
@@ -74,12 +75,19 @@
 
                 <div>
                     <label for="line_name" class="block text-sm font-semibold text-gray-700 mb-2">Line Name</label>
-                    <input type="text" 
-                           name="line_name" 
-                           id="line_name" 
-                           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('line_name') border-red-500 @enderror" 
-                           value="{{ old('line_name', $roomErp->line_name) }}" 
-                           placeholder="Enter line name">
+                    <select name="line_name" 
+                            id="line_name" 
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('line_name') border-red-500 @enderror">
+                        <option value="">-- Pilih Line --</option>
+                        @foreach($lines as $line)
+                            <option value="{{ $line->name }}" 
+                                    data-plant="{{ $line->plant->name ?? '' }}"
+                                    data-process="{{ $line->process->name ?? '' }}"
+                                    {{ old('line_name', $roomErp->line_name) == $line->name ? 'selected' : '' }}>
+                                {{ $line->name }}, {{ $line->plant->name ?? '-' }}-{{ $line->process->name ?? '-' }}
+                            </option>
+                        @endforeach
+                    </select>
                     @error('line_name')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                     @enderror
@@ -90,9 +98,10 @@
                     <input type="text" 
                            name="process_name" 
                            id="process_name" 
-                           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('process_name') border-red-500 @enderror" 
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('process_name') border-red-500 @enderror" 
                            value="{{ old('process_name', $roomErp->process_name) }}" 
-                           placeholder="Enter process name">
+                           placeholder="Auto-filled from Line"
+                           readonly>
                     @error('process_name')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                     @enderror
@@ -123,5 +132,44 @@
         </form>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lineSelect = document.getElementById('line_name');
+    const plantNameInput = document.getElementById('plant_name');
+    const processNameInput = document.getElementById('process_name');
+
+    // Auto-fill Plant Name and Process Name when Line is selected
+    if (lineSelect) {
+        lineSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption && selectedOption.value) {
+                const plantName = selectedOption.getAttribute('data-plant') || '';
+                const processName = selectedOption.getAttribute('data-process') || '';
+                
+                if (plantNameInput) {
+                    plantNameInput.value = plantName;
+                }
+                if (processNameInput) {
+                    processNameInput.value = processName;
+                }
+            } else {
+                // Clear if no line selected
+                if (plantNameInput) {
+                    plantNameInput.value = '';
+                }
+                if (processNameInput) {
+                    processNameInput.value = '';
+                }
+            }
+        });
+
+        // Trigger change event on page load if line is already selected
+        if (lineSelect.value) {
+            lineSelect.dispatchEvent(new Event('change'));
+        }
+    }
+});
+</script>
 @endsection
 

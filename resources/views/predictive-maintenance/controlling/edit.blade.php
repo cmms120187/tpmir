@@ -226,7 +226,7 @@
                         <label for="photo_before" class="block text-sm font-medium text-gray-700 mb-2">Photo Before</label>
                         @if($execution->photo_before)
                             <div class="mb-2">
-                                <img src="{{ asset('storage/' . $execution->photo_before) }}" alt="Photo Before" class="w-full h-48 object-cover rounded border">
+                                <img src="{{ Storage::disk('public')->url($execution->photo_before) }}" alt="Photo Before" class="w-full h-48 object-cover rounded border">
                             </div>
                         @endif
                         <input type="file"
@@ -244,7 +244,7 @@
                         <label for="photo_after" class="block text-sm font-medium text-gray-700 mb-2">Photo After</label>
                         @if($execution->photo_after)
                             <div class="mb-2">
-                                <img src="{{ asset('storage/' . $execution->photo_after) }}" alt="Photo After" class="w-full h-48 object-cover rounded border">
+                                <img src="{{ Storage::disk('public')->url($execution->photo_after) }}" alt="Photo After" class="w-full h-48 object-cover rounded border">
                             </div>
                         @endif
                         <input type="file"

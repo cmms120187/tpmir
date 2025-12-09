@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <input type="hidden" 
                                        name="machine_id" 
                                        id="machine_id" 
-                                       value="{{ old('machine_id', $schedule->machine_id) }}"
+                                       value="{{ old('machine_id', $schedule->machine_erp_id) }}"
                                        required>
                                 <div id="machine_id_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                                     <!-- Options will be populated here -->
@@ -88,17 +88,17 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <span class="hidden sm:inline">Scan</span>
                             </button>
                         </div>
-                        <div id="selected_machine" class="mt-2 @if(!old('machine_id', $schedule->machine_id)) hidden @endif">
+                        <div id="selected_machine" class="mt-2 @if(!old('machine_id', $schedule->machine_erp_id)) hidden @endif">
                             <div class="bg-blue-50 border border-blue-200 rounded px-3 py-2 flex items-center justify-between">
                                 <span class="text-sm text-blue-900">
                                     <span class="font-semibold" id="selected_machine_id">
-                                        @if(old('machine_id', $schedule->machine_id))
-                                            {{ $schedule->machine->idMachine ?? '-' }}
+                                        @if(old('machine_id', $schedule->machine_erp_id))
+                                            {{ $schedule->machineErp->idMachine ?? '-' }}
                                         @endif
                                     </span>
                                     <span class="text-blue-600" id="selected_machine_info">
-                                        @if(old('machine_id', $schedule->machine_id))
-                                            {{ $schedule->machine->machineType->name ?? '-' }} - ({{ $schedule->machine->plant->name ?? '-' }} / {{ $schedule->machine->process->name ?? '-' }} / {{ $schedule->machine->line->name ?? '-' }})
+                                        @if(old('machine_id', $schedule->machine_erp_id))
+                                            {{ $schedule->machineErp->machineType->name ?? $schedule->machineErp->type_name ?? '-' }} - ({{ $schedule->machineErp->plant_name ?? '-' }} / {{ $schedule->machineErp->process_name ?? '-' }} / {{ $schedule->machineErp->line_name ?? '-' }})
                                         @endif
                                     </span>
                                 </span>
@@ -297,10 +297,11 @@ const machines = @json($machines->map(function($machine) {
     return [
         'id' => $machine->id,
         'idMachine' => $machine->idMachine,
-        'machineType' => $machine->machineType->name ?? '-',
-        'plant' => $machine->plant->name ?? '-',
-        'process' => $machine->process->name ?? '-',
-        'line' => $machine->line->name ?? '-',
+        'machineType' => $machine->machineType->name ?? $machine->type_name ?? '-',
+        'plant' => $machine->plant_name ?? '-',
+        'process' => $machine->process_name ?? '-',
+        'line' => $machine->line_name ?? '-',
+        'room' => $machine->roomErp->roomName ?? $machine->room_name ?? '-',
     ];
 }));
 

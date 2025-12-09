@@ -56,15 +56,11 @@ Route::middleware('auth')->group(function () {
         Route::resource('lines', LineController::class);
         Route::post('lines/import-from-room-erp', [LineController::class, 'importFromRoomErp'])->name('lines.import-from-room-erp');
         // Room ERP Routes
-        Route::post('room-erp/upload', [\App\Http\Controllers\RoomErpController::class, 'upload'])->name('room-erp.upload');
-        Route::get('room-erp/download', [\App\Http\Controllers\RoomErpController::class, 'download'])->name('room-erp.download');
         Route::resource('room-erp', \App\Http\Controllers\RoomErpController::class);
     });
     
     // Machine ERP Routes - Group Leader and above
     Route::middleware('role:group_leader,coordinator,ast_manager,manager,general_manager')->group(function () {
-        Route::post('machine-erp/upload', [\App\Http\Controllers\MachineErpController::class, 'upload'])->name('machine-erp.upload');
-        Route::get('machine-erp/download', [\App\Http\Controllers\MachineErpController::class, 'download'])->name('machine-erp.download');
         Route::post('machine-erp/synchronize', [\App\Http\Controllers\MachineErpController::class, 'synchronize'])->name('machine-erp.synchronize');
         Route::resource('machine-erp', \App\Http\Controllers\MachineErpController::class);
         
@@ -74,21 +70,22 @@ Route::middleware('auth')->group(function () {
     
     // Part ERP Routes - Coordinator and above
     Route::middleware('role:coordinator,ast_manager,manager,general_manager')->group(function () {
-        Route::post('part-erp/upload', [\App\Http\Controllers\PartErpController::class, 'upload'])->name('part-erp.upload');
-        Route::get('part-erp/download', [\App\Http\Controllers\PartErpController::class, 'download'])->name('part-erp.download');
         Route::resource('part-erp', \App\Http\Controllers\PartErpController::class);
     });
     
     // Downtime ERP2 Routes
-    Route::post('downtime-erp2/upload', [\App\Http\Controllers\DowntimeErp2Controller::class, 'upload'])->name('downtime-erp2.upload');
-    Route::get('downtime-erp2/download', [\App\Http\Controllers\DowntimeErp2Controller::class, 'download'])->name('downtime-erp2.download');
     Route::resource('downtime-erp2', \App\Http\Controllers\DowntimeErp2Controller::class);
+    Route::get('production-hourly/create-bulk', [\App\Http\Controllers\ProductionHourlyController::class, 'createBulk'])->name('production-hourly.create-bulk');
+    Route::post('production-hourly/bulk-fill-target', [\App\Http\Controllers\ProductionHourlyController::class, 'bulkFillTarget'])->name('production-hourly.bulk-fill-target');
+    Route::get('production-hourly/show/{lineId}/{processId}/{date}', [\App\Http\Controllers\ProductionHourlyController::class, 'show'])->name('production-hourly.show-detail');
+    Route::resource('production-hourly', \App\Http\Controllers\ProductionHourlyController::class);
     
     // Activity Routes
-    Route::post('activities/upload', [\App\Http\Controllers\ActivityController::class, 'upload'])->name('activities.upload');
-    Route::get('activities/download', [\App\Http\Controllers\ActivityController::class, 'download'])->name('activities.download');
+    // IMPORTANT: Custom routes must be defined BEFORE resource route to avoid route conflicts
     Route::get('activities/search-mechanic', [\App\Http\Controllers\ActivityController::class, 'searchMechanic'])->name('activities.search-mechanic');
     Route::post('activities/batch-update-location', [\App\Http\Controllers\ActivityController::class, 'batchUpdateLocation'])->name('activities.batch-update-location')->middleware('role:admin');
+    Route::get('activities/download', [\App\Http\Controllers\ActivityController::class, 'download'])->name('activities.download')->middleware('role:admin');
+    Route::post('activities/upload', [\App\Http\Controllers\ActivityController::class, 'upload'])->name('activities.upload')->middleware('role:admin');
     Route::resource('activities', \App\Http\Controllers\ActivityController::class);
     
     // Custom routes for rooms (must be BEFORE resource route)
@@ -162,6 +159,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('scheduling/delete-by-machine/{machineId}', [SchedulingController::class, 'deleteByMachine'])->name('scheduling.delete-by-machine');
         Route::post('scheduling/batch-update-status', [SchedulingController::class, 'batchUpdateStatus'])->name('scheduling.batch-update-status');
         Route::post('scheduling/reschedule', [SchedulingController::class, 'reschedule'])->name('scheduling.reschedule');
+        Route::post('scheduling/update-pic', [SchedulingController::class, 'updatePic'])->name('scheduling.update-pic');
         Route::resource('scheduling', SchedulingController::class);
         
         // Controlling - Custom routes must be defined BEFORE resource routes
@@ -198,6 +196,8 @@ Route::middleware('auth')->group(function () {
         Route::get('controlling/get-machines-by-type', [PredictiveControllingController::class, 'getMachinesByType'])->name('controlling.get-machines-by-type');
         Route::get('controlling/get-maintenance-points-by-machine-and-date', [PredictiveControllingController::class, 'getMaintenancePointsByMachineAndDate'])->name('controlling.get-maintenance-points-by-machine-and-date');
         Route::get('controlling/machine-condition/{machineId}', [PredictiveControllingController::class, 'showMachineCondition'])->name('controlling.machine-condition');
+        Route::get('controlling/export', [PredictiveControllingController::class, 'export'])->name('controlling.export');
+        Route::post('controlling/import', [PredictiveControllingController::class, 'import'])->name('controlling.import');
         Route::resource('controlling', PredictiveControllingController::class);
         
         // Monitoring
@@ -210,6 +210,8 @@ Route::middleware('auth')->group(function () {
         Route::put('updating/{id}', [PredictiveUpdatingController::class, 'update'])->name('updating.update');
         
         // Reporting
+        Route::get('reporting/get-schedule-points-by-machine-and-date', [PredictiveReportingController::class, 'getSchedulePointsByMachineAndDate'])->name('reporting.get-schedule-points-by-machine-and-date');
+        Route::get('reporting/get-point-trends-by-machine', [PredictiveReportingController::class, 'getPointTrendsByMachine'])->name('reporting.get-point-trends-by-machine');
         Route::get('reporting', [PredictiveReportingController::class, 'index'])->name('reporting.index');
         Route::get('reporting/schedule', [PredictiveReportingController::class, 'scheduleReport'])->name('reporting.schedule');
         Route::get('reporting/execution', [PredictiveReportingController::class, 'executionReport'])->name('reporting.execution');
@@ -219,6 +221,27 @@ Route::middleware('auth')->group(function () {
     // Standards CRUD - Group Leader and above
     Route::middleware('role:group_leader,coordinator,ast_manager,manager,general_manager')->group(function () {
         Route::resource('standards', \App\Http\Controllers\StandardController::class);
+    });
+    
+    // Upload & Download Routes - Admin only
+    Route::middleware('role:admin')->group(function () {
+        // Room ERP Upload/Download
+        Route::post('room-erp/upload', [\App\Http\Controllers\RoomErpController::class, 'upload'])->name('room-erp.upload');
+        Route::get('room-erp/download', [\App\Http\Controllers\RoomErpController::class, 'download'])->name('room-erp.download');
+        
+        // Machine ERP Upload/Download
+        Route::post('machine-erp/upload', [\App\Http\Controllers\MachineErpController::class, 'upload'])->name('machine-erp.upload');
+        Route::get('machine-erp/download', [\App\Http\Controllers\MachineErpController::class, 'download'])->name('machine-erp.download');
+        
+        // Part ERP Upload/Download
+        Route::post('part-erp/upload', [\App\Http\Controllers\PartErpController::class, 'upload'])->name('part-erp.upload');
+        Route::get('part-erp/download', [\App\Http\Controllers\PartErpController::class, 'download'])->name('part-erp.download');
+        
+        // Downtime ERP2 Upload/Download
+        Route::post('downtime-erp2/upload', [\App\Http\Controllers\DowntimeErp2Controller::class, 'upload'])->name('downtime-erp2.upload');
+        Route::get('downtime-erp2/download', [\App\Http\Controllers\DowntimeErp2Controller::class, 'download'])->name('downtime-erp2.download');
+        
+        // Activities Upload/Download - Moved to before resource route (line 87-88) to avoid route conflicts
     });
     
     // Permissions Management - Admin only

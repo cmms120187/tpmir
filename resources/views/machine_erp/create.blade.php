@@ -110,64 +110,65 @@
             <!-- Hidden field for kode_room -->
             <input type="hidden" name="kode_room" id="kode_room" value="{{ old('kode_room') }}">
 
-                <div class="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                    <label for="model_select" class="block text-sm font-semibold text-gray-700 mb-2">
-                        Pilih Model (untuk auto-fill Group/System/Type/Brand/Model)
-                    </label>
-                    <select id="model_select" 
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
-                        <option value="">-- Pilih Model atau isi manual --</option>
-                        @foreach($models as $model)
-                            <option value="{{ $model->id }}">
-                                {{ $model->name }}
-                                @if($model->machineType)
-                                    - {{ $model->machineType->name }}
-                                @endif
-                                @if($model->brand)
-                                    ({{ $model->brand->name }})
-                                @endif
-                            </option>
-                        @endforeach
-                    </select>
-                    <p class="text-xs text-gray-500 mt-1">Pilih model untuk mengisi otomatis field Group, System, Type, Brand, dan Model</p>
-                </div>
+            <div class="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                <label for="model_select" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Pilih Model (Opsional - untuk auto-fill Group/System/Type/Brand/Model)
+                </label>
+                <select id="model_select" 
+                        class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    <option value="">-- Pilih Model (Opsional) atau biarkan kosong --</option>
+                    @foreach($models as $model)
+                        <option value="{{ $model->id }}">
+                            {{ $model->name }}
+                            @if($model->machineType)
+                                - {{ $model->machineType->name }}
+                            @endif
+                            @if($model->brand)
+                                ({{ $model->brand->name }})
+                            @endif
+                        </option>
+                    @endforeach
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Pilih model untuk mengisi otomatis field Group, System, Type, Brand, dan Model. Jika tidak dipilih, field tersebut bisa dikosongkan.</p>
+            </div>
 
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
-                    <label for="group_id" class="block text-sm font-semibold text-gray-700 mb-2">Group</label>
+                    <label for="group_id" class="block text-sm font-semibold text-gray-700 mb-2">Group (Opsional)</label>
                     <input type="hidden" name="group_id" id="group_id" value="{{ old('group_id') }}">
                     <input type="text" 
                            id="group_display" 
-                           class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 cursor-not-allowed" 
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-700 cursor-not-allowed" 
                            readonly
-                           placeholder="Akan terisi otomatis dari Machine Type">
+                           placeholder="Akan terisi otomatis dari Model (jika dipilih)">
                     @error('group_id')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                     @enderror
                 </div>
 
                 <div>
-                    <label for="type_name" class="block text-sm font-semibold text-gray-700 mb-2">Type Name</label>
+                    <label for="type_name" class="block text-sm font-semibold text-gray-700 mb-2">Type Name (Opsional)</label>
                     <input type="text" 
                            name="type_name" 
                            id="type_name" 
-                           class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 cursor-not-allowed" 
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-700 cursor-not-allowed" 
                            value="{{ old('type_name') }}" 
                            readonly
-                           placeholder="Akan terisi otomatis dari Machine Type">
+                           placeholder="Akan terisi otomatis dari Model (jika dipilih)">
                     @error('type_name')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                     @enderror
                 </div>
 
                 <div>
-                    <label for="brand_name" class="block text-sm font-semibold text-gray-700 mb-2">Brand Name</label>
+                    <label for="brand_name" class="block text-sm font-semibold text-gray-700 mb-2">Brand Name (Opsional)</label>
                     <input type="text" 
                            name="brand_name" 
                            id="brand_name" 
-                           class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 cursor-not-allowed" 
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-700 cursor-not-allowed" 
                            value="{{ old('brand_name') }}" 
                            readonly
-                           placeholder="Akan terisi otomatis dari Machine Type">
+                           placeholder="Akan terisi otomatis dari Model (jika dipilih)">
                     @error('brand_name')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                     @enderror
@@ -180,16 +181,16 @@
                 <div id="systems_list" class="text-sm text-gray-700"></div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <div>
                     <label for="model_name" class="block text-sm font-semibold text-gray-700 mb-2">Model Name</label>
                     <input type="text" 
                            name="model_name" 
                            id="model_name" 
-                           class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 cursor-not-allowed" 
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-700 cursor-not-allowed" 
                            value="{{ old('model_name') }}" 
                            readonly
-                           placeholder="Akan terisi otomatis dari Model yang dipilih">
+                           placeholder="Akan terisi otomatis dari Model">
                     @error('model_name')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                     @enderror
@@ -220,9 +221,7 @@
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                     @enderror
                 </div>
-            </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label for="no_document" class="block text-sm font-semibold text-gray-700 mb-2">No Document</label>
                     <input type="text" 
@@ -235,6 +234,9 @@
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                     @enderror
                 </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-1 gap-4 mb-4">
 
                 <div>
                     <label for="photo" class="block text-sm font-semibold text-gray-700 mb-2">Photo (Khusus untuk Model ini)</label>
@@ -279,7 +281,7 @@ const groupIdInput = document.getElementById('group_id');
 const groupDisplayInput = document.getElementById('group_display');
 const typeNameInput = document.getElementById('type_name');
 const brandNameInput = document.getElementById('brand_name');
-const modelNameSelect = document.getElementById('model_name');
+const modelNameInput = document.getElementById('model_name');
 const systemsInfo = document.getElementById('systems_info');
 const systemsList = document.getElementById('systems_list');
 
@@ -304,41 +306,43 @@ if (roomErpSelect) {
     });
 }
 
-// Handle Machine Type selection change
-if (machineTypeSelect) {
-    machineTypeSelect.addEventListener('change', function() {
-        const selectedMachineTypeId = this.value;
+// Handle Model selection change
+if (modelSelect) {
+    modelSelect.addEventListener('change', function() {
+        const selectedModelId = this.value;
         
-        if (!selectedMachineTypeId) {
+        if (!selectedModelId) {
             // Clear all fields
             groupIdInput.value = '';
             groupDisplayInput.value = '';
             typeNameInput.value = '';
             brandNameInput.value = '';
-            modelNameSelect.innerHTML = '<option value="">-- Pilih Model --</option>';
+            modelNameInput.value = '';
             systemsInfo.classList.add('hidden');
             return;
         }
         
-        // Find selected machine type
-        const selectedMT = machineTypesData.find(mt => mt.id === selectedMachineTypeId);
+        // Find selected model
+        const selectedModel = modelsData.find(m => m.id === selectedModelId);
         
-        if (selectedMT) {
+        if (selectedModel) {
+            // Fill Model Name
+            modelNameInput.value = selectedModel.name || '';
+            
             // Fill Type Name
-            typeNameInput.value = selectedMT.name || '';
+            typeNameInput.value = selectedModel.type_name || '';
             
             // Fill Brand Name
-            brandNameInput.value = selectedMT.brand || '';
+            brandNameInput.value = selectedModel.brand_name || '';
             
             // Fill Group
-            if (selectedMT.group_id) {
-                groupIdInput.value = selectedMT.group_id;
-                groupDisplayInput.value = selectedMT.group_name || '';
+            if (selectedModel.group_id) {
+                groupIdInput.value = selectedModel.group_id;
+                groupDisplayInput.value = selectedModel.group_name || '';
                 
-                // Display systems from group
-                const selectedGroup = groupsData.find(g => g.id === selectedMT.group_id);
-                if (selectedGroup && selectedGroup.systems && selectedGroup.systems.length > 0) {
-                    systemsList.innerHTML = selectedGroup.systems.map(system => {
+                // Display systems from model's machine type
+                if (selectedModel.systems && selectedModel.systems.length > 0) {
+                    systemsList.innerHTML = selectedModel.systems.map(system => {
                         return `<div class="mb-1">
                             <span class="font-semibold">${system.nama_sistem || ''}</span>
                             ${system.deskripsi ? `<span class="text-gray-600"> - ${system.deskripsi}</span>` : ''}
@@ -352,23 +356,6 @@ if (machineTypeSelect) {
                 groupIdInput.value = '';
                 groupDisplayInput.value = '';
                 systemsInfo.classList.add('hidden');
-            }
-            
-            // Fill Model dropdown
-            modelNameSelect.innerHTML = '<option value="">-- Pilih Model --</option>';
-            if (selectedMT.models && selectedMT.models.length > 0) {
-                selectedMT.models.forEach(model => {
-                    const option = document.createElement('option');
-                    option.value = model.name;
-                    option.textContent = model.name;
-                    modelNameSelect.appendChild(option);
-                });
-            } else if (selectedMT.model) {
-                // If machine type has a default model, add it
-                const option = document.createElement('option');
-                option.value = selectedMT.model;
-                option.textContent = selectedMT.model;
-                modelNameSelect.appendChild(option);
             }
         }
     });

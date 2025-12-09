@@ -845,20 +845,207 @@ function capturePhoto() {
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0);
     
-    // Convert canvas to blob
-    canvas.toBlob(function(blob) {
-        if (blob) {
-            // Create a File object from blob
-            const file = new File([blob], 'camera_' + Date.now() + '.jpg', { type: 'image/jpeg' });
-            photoFiles.push(file);
-            updatePhotoPreviews();
-            updateFileInput();
+    // Add watermark before converting to blob
+    addWatermarkToCanvas(canvas, ctx).then(() => {
+        // Convert canvas to blob after watermark is added
+        canvas.toBlob(function(blob) {
+            if (blob) {
+                // Create a File object from blob
+                const file = new File([blob], 'camera_' + Date.now() + '.jpg', { type: 'image/jpeg' });
+                photoFiles.push(file);
+                updatePhotoPreviews();
+                updateFileInput();
+                
+                // Optionally stop camera after capture
+                // stopCamera();
+                // closeCameraModal();
+            }
+        }, 'image/jpeg', 0.9);
+    });
+}
+
+// Function to add watermark to canvas
+async function addWatermarkToCanvas(canvas, ctx) {
+    return new Promise((resolve) => {
+        // Get data from form
+        const namaMekanik = document.getElementById('nama_mekanik')?.value || '';
+        const idMekanik = document.getElementById('id_mekanik')?.value || '';
+        const roomName = document.getElementById('room_name')?.value || '';
+        const plant = document.getElementById('plant')?.value || '';
+        const description = document.getElementById('description')?.value || '';
+        
+        // Get first 3 words from description
+        const descriptionWords = description.trim().split(/\s+/).slice(0, 3).join(' ');
+        
+        // Prepare text lines
+        const mekanikText = idMekanik && namaMekanik ? `${namaMekanik} / ${idMekanik}` : (namaMekanik || idMekanik || '');
+        const locationText = roomName && plant ? `${roomName} / ${plant}` : (roomName || plant || '');
+        const descText = descriptionWords || '';
+        
+        // Calculate watermark size (20% of photo width/height)
+        const watermarkWidth = Math.min(canvas.width * 0.2, 300);
+        const watermarkHeight = Math.min(canvas.height * 0.2, 200);
+        
+        // Position: left bottom (with padding)
+        const padding = Math.max(10, canvas.width * 0.01);
+        const watermarkX = padding;
+        const watermarkY = canvas.height - watermarkHeight - padding;
+        
+        // Create watermark canvas
+        const watermarkCanvas = document.createElement('canvas');
+        watermarkCanvas.width = watermarkWidth;
+        watermarkCanvas.height = watermarkHeight;
+        const watermarkCtx = watermarkCanvas.getContext('2d');
+        
+        // Load logo
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'anonymous';
+        logoImg.onload = function() {
+            // Clear watermark canvas
+            watermarkCtx.clearRect(0, 0, watermarkWidth, watermarkHeight);
             
-            // Optionally stop camera after capture
-            // stopCamera();
-            // closeCameraModal();
-        }
-    }, 'image/jpeg', 0.9);
+            // Set opacity to 50% for entire watermark
+            watermarkCtx.globalAlpha = 0.5;
+            
+            // Draw logo (at top left of watermark area)
+            const logoSize = Math.min(watermarkWidth * 0.25, watermarkHeight * 0.25, 40);
+            const logoX = 0;
+            const logoY = 0;
+            watermarkCtx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+            
+            // Set text properties with better sizing
+            const fontSize = Math.max(8, Math.min(watermarkWidth * 0.04, 14));
+            watermarkCtx.font = `bold ${fontSize}px Arial`;
+            watermarkCtx.fillStyle = '#FFFFFF';
+            watermarkCtx.strokeStyle = '#000000';
+            watermarkCtx.lineWidth = 2;
+            watermarkCtx.textAlign = 'left';
+            watermarkCtx.textBaseline = 'top';
+            
+            // Calculate text positions
+            let textY = logoSize + 5;
+            const lineHeight = fontSize + 4;
+            const maxTextWidth = watermarkWidth - 5;
+            
+            // Draw text with stroke for better visibility
+            if (mekanikText) {
+                // Truncate text if too long
+                let text = mekanikText;
+                const metrics = watermarkCtx.measureText(text);
+                if (metrics.width > maxTextWidth) {
+                    while (watermarkCtx.measureText(text + '...').width > maxTextWidth && text.length > 0) {
+                        text = text.slice(0, -1);
+                    }
+                    text += '...';
+                }
+                watermarkCtx.strokeText(text, 0, textY);
+                watermarkCtx.fillText(text, 0, textY);
+                textY += lineHeight;
+            }
+            
+            if (locationText) {
+                let text = locationText;
+                const metrics = watermarkCtx.measureText(text);
+                if (metrics.width > maxTextWidth) {
+                    while (watermarkCtx.measureText(text + '...').width > maxTextWidth && text.length > 0) {
+                        text = text.slice(0, -1);
+                    }
+                    text += '...';
+                }
+                watermarkCtx.strokeText(text, 0, textY);
+                watermarkCtx.fillText(text, 0, textY);
+                textY += lineHeight;
+            }
+            
+            if (descText) {
+                let text = descText;
+                const metrics = watermarkCtx.measureText(text);
+                if (metrics.width > maxTextWidth) {
+                    while (watermarkCtx.measureText(text + '...').width > maxTextWidth && text.length > 0) {
+                        text = text.slice(0, -1);
+                    }
+                    text += '...';
+                }
+                watermarkCtx.strokeText(text, 0, textY);
+                watermarkCtx.fillText(text, 0, textY);
+            }
+            
+            // Draw watermark onto main canvas with 50% opacity
+            ctx.globalAlpha = 0.5;
+            ctx.drawImage(watermarkCanvas, watermarkX, watermarkY);
+            ctx.globalAlpha = 1.0;
+            
+            resolve();
+        };
+        
+        logoImg.onerror = function() {
+            // If logo fails to load, just draw text
+            watermarkCtx.clearRect(0, 0, watermarkWidth, watermarkHeight);
+            watermarkCtx.globalAlpha = 0.5;
+            
+            const fontSize = Math.max(8, Math.min(watermarkWidth * 0.04, 14));
+            watermarkCtx.font = `bold ${fontSize}px Arial`;
+            watermarkCtx.fillStyle = '#FFFFFF';
+            watermarkCtx.strokeStyle = '#000000';
+            watermarkCtx.lineWidth = 2;
+            watermarkCtx.textAlign = 'left';
+            watermarkCtx.textBaseline = 'top';
+            
+            let textY = 5;
+            const lineHeight = fontSize + 4;
+            const maxTextWidth = watermarkWidth - 5;
+            
+            if (mekanikText) {
+                let text = mekanikText;
+                const metrics = watermarkCtx.measureText(text);
+                if (metrics.width > maxTextWidth) {
+                    while (watermarkCtx.measureText(text + '...').width > maxTextWidth && text.length > 0) {
+                        text = text.slice(0, -1);
+                    }
+                    text += '...';
+                }
+                watermarkCtx.strokeText(text, 0, textY);
+                watermarkCtx.fillText(text, 0, textY);
+                textY += lineHeight;
+            }
+            
+            if (locationText) {
+                let text = locationText;
+                const metrics = watermarkCtx.measureText(text);
+                if (metrics.width > maxTextWidth) {
+                    while (watermarkCtx.measureText(text + '...').width > maxTextWidth && text.length > 0) {
+                        text = text.slice(0, -1);
+                    }
+                    text += '...';
+                }
+                watermarkCtx.strokeText(text, 0, textY);
+                watermarkCtx.fillText(text, 0, textY);
+                textY += lineHeight;
+            }
+            
+            if (descText) {
+                let text = descText;
+                const metrics = watermarkCtx.measureText(text);
+                if (metrics.width > maxTextWidth) {
+                    while (watermarkCtx.measureText(text + '...').width > maxTextWidth && text.length > 0) {
+                        text = text.slice(0, -1);
+                    }
+                    text += '...';
+                }
+                watermarkCtx.strokeText(text, 0, textY);
+                watermarkCtx.fillText(text, 0, textY);
+            }
+            
+            ctx.globalAlpha = 0.5;
+            ctx.drawImage(watermarkCanvas, watermarkX, watermarkY);
+            ctx.globalAlpha = 1.0;
+            
+            resolve();
+        };
+        
+        // Set logo source
+        logoImg.src = '{{ asset("images/logo_tpm.png") }}';
+    });
 }
 
 // Duration calculation

@@ -19,10 +19,59 @@ class MachineErpController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $machineErps = MachineErp::orderBy('idMachine', 'asc')->paginate(10);
-        return view('machine_erp.index', compact('machineErps'));
+        $query = MachineErp::query();
+        
+        // Apply filters
+        if ($request->filled('filter_id_machine')) {
+            $query->where('idMachine', 'like', '%' . $request->filter_id_machine . '%');
+        }
+        
+        if ($request->filled('filter_kode_room')) {
+            $query->where('kode_room', 'like', '%' . $request->filter_kode_room . '%');
+        }
+        
+        if ($request->filled('filter_plant_name')) {
+            $query->where('plant_name', 'like', '%' . $request->filter_plant_name . '%');
+        }
+        
+        if ($request->filled('filter_process_name')) {
+            $query->where('process_name', 'like', '%' . $request->filter_process_name . '%');
+        }
+        
+        if ($request->filled('filter_line_name')) {
+            $query->where('line_name', 'like', '%' . $request->filter_line_name . '%');
+        }
+        
+        if ($request->filled('filter_room_name')) {
+            $query->where('room_name', 'like', '%' . $request->filter_room_name . '%');
+        }
+        
+        if ($request->filled('filter_type_name')) {
+            $query->where('type_name', 'like', '%' . $request->filter_type_name . '%');
+        }
+        
+        if ($request->filled('filter_brand_name')) {
+            $query->where('brand_name', 'like', '%' . $request->filter_brand_name . '%');
+        }
+        
+        if ($request->filled('filter_model_name')) {
+            $query->where('model_name', 'like', '%' . $request->filter_model_name . '%');
+        }
+        
+        // Get unique values for filter dropdowns
+        $plantNames = MachineErp::whereNotNull('plant_name')->distinct()->orderBy('plant_name')->pluck('plant_name')->toArray();
+        $processNames = MachineErp::whereNotNull('process_name')->distinct()->orderBy('process_name')->pluck('process_name')->toArray();
+        $lineNames = MachineErp::whereNotNull('line_name')->distinct()->orderBy('line_name')->pluck('line_name')->toArray();
+        $roomNames = MachineErp::whereNotNull('room_name')->distinct()->orderBy('room_name')->pluck('room_name')->toArray();
+        $typeNames = MachineErp::whereNotNull('type_name')->distinct()->orderBy('type_name')->pluck('type_name')->toArray();
+        $brandNames = MachineErp::whereNotNull('brand_name')->distinct()->orderBy('brand_name')->pluck('brand_name')->toArray();
+        $modelNames = MachineErp::whereNotNull('model_name')->distinct()->orderBy('model_name')->pluck('model_name')->toArray();
+        
+        $machineErps = $query->orderBy('idMachine', 'asc')->paginate(15)->withQueryString();
+        
+        return view('machine_erp.index', compact('machineErps', 'plantNames', 'processNames', 'lineNames', 'roomNames', 'typeNames', 'brandNames', 'modelNames'));
     }
 
     /**
@@ -94,7 +143,7 @@ class MachineErpController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'idMachine' => 'required|string|max:255',
+            'idMachine' => 'required|string|max:255|unique:machine_erp,idMachine',
             'plant_name' => 'nullable|string|max:255',
             'process_name' => 'nullable|string|max:255',
             'line_name' => 'nullable|string|max:255',
@@ -266,7 +315,7 @@ class MachineErpController extends Controller
     public function update(Request $request, string $id)
     {
         $validated = $request->validate([
-            'idMachine' => 'required|string|max:255',
+            'idMachine' => 'required|string|max:255|unique:machine_erp,idMachine,' . $id,
             'plant_name' => 'nullable|string|max:255',
             'process_name' => 'nullable|string|max:255',
             'line_name' => 'nullable|string|max:255',
@@ -348,7 +397,26 @@ class MachineErpController extends Controller
         $validated['machine_type_id'] = $machineTypeId;
         unset($validated['group_id']); // Remove group_id from validated as it's not a column in machine_erp
 
-        $machineErp = MachineErp::findOrFail($id);
+        // Update kode_room based on new location (plant_name, process_name, line_name, room_name)
+        if (isset($validated['plant_name']) && isset($validated['process_name']) && 
+            isset($validated['line_name']) && isset($validated['room_name'])) {
+            
+            // Find RoomERP that matches the new location
+            $roomErp = RoomErp::where('plant_name', $validated['plant_name'])
+                ->where('process_name', $validated['process_name'])
+                ->where('line_name', $validated['line_name'])
+                ->where('name', $validated['room_name'])
+                ->first();
+            
+            // If RoomERP found and has kode_room, update kode_room
+            if ($roomErp && $roomErp->kode_room) {
+                $validated['kode_room'] = $roomErp->kode_room;
+            } else {
+                // If no matching RoomERP found, clear kode_room
+                $validated['kode_room'] = null;
+            }
+        }
+        
         $machineErp->update($validated);
         
         // Redirect back to the same page if page parameter exists

@@ -98,22 +98,29 @@
                             <p class="text-sm font-semibold text-gray-700 mb-2">Current Photo:</p>
                             <div class="bg-gray-50 rounded-lg p-3 border border-gray-200 inline-block">
                                 @php
-                                    $photoUrl = asset('storage/' . $machineType->photo);
-                                    $photoExists = \Illuminate\Support\Facades\Storage::disk('public')->exists($machineType->photo);
+                                    // Check for .webp version first
+                                    $photoPath = $machineType->photo;
+                                    $webpPath = preg_replace('/\.(jpg|jpeg|png|gif)$/i', '.webp', $photoPath);
+                                    $photoExists = \Illuminate\Support\Facades\Storage::disk('public')->exists($photoPath);
+                                    $webpExists = \Illuminate\Support\Facades\Storage::disk('public')->exists($webpPath);
+                                    
+                                    // Use webp if exists, otherwise use original
+                                    $actualPath = $webpExists ? $webpPath : $photoPath;
+                                    $photoUrl = asset('public-storage/' . $actualPath);
                                 @endphp
-                                @if($photoExists)
+                                @if($photoExists || $webpExists)
                                     <img src="{{ $photoUrl }}" 
                                          alt="Current Photo" 
                                          class="max-w-xs max-h-64 object-contain rounded border shadow-sm"
                                          onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='block';">
                                     <div style="display:none;" class="text-sm text-red-500 mt-2">
                                         <p>Photo tidak dapat dimuat</p>
-                                        <p class="text-xs">Path: {{ $machineType->photo }}</p>
+                                        <p class="text-xs">Path: {{ $actualPath }}</p>
                                     </div>
                                 @else
                                     <div class="text-sm text-red-500">
                                         <p>Photo tidak ditemukan di storage</p>
-                                        <p class="text-xs">Path: {{ $machineType->photo }}</p>
+                                        <p class="text-xs">Path: {{ $photoPath }}</p>
                                     </div>
                                 @endif
                             </div>
@@ -236,8 +243,11 @@
                                     <div class="bg-white rounded p-3 border border-gray-200">
                                         <div class="flex items-start gap-3">
                                             @if($point->photo)
+                                                @php
+                                                    $photoUrl = asset('public-storage/' . $point->photo);
+                                                @endphp
                                                 <div class="flex-shrink-0">
-                                                    <img src="{{ Storage::url($point->photo) }}" alt="Photo" class="w-12 h-20 object-cover rounded border cursor-pointer" onclick="openPhotoModal('{{ Storage::url($point->photo) }}')">
+                                                    <img src="{{ $photoUrl }}" alt="Photo" class="w-12 h-20 object-cover rounded border cursor-pointer" onclick="openPhotoModal('{{ $photoUrl }}')" onerror="this.style.display='none';">
                                                 </div>
                                             @endif
                                             <div class="flex-1 min-w-0">
@@ -260,7 +270,7 @@
                                                     </div>
                                                     <div class="flex gap-1 flex-shrink-0">
                                                         <button type="button" 
-                                                            onclick="openEditModal({{ $point->id }}, '{{ $point->category }}', @js($point->name), @js($point->instruction ?? ''), {{ $point->sequence }}, '{{ $point->frequency_type ?? '' }}', {{ $point->frequency_value ?? 1 }}, '{{ $point->photo ? Storage::url($point->photo) : '' }}', {{ $point->standard_id ?: 'null' }}, {{ $point->duration ?: 'null' }})"
+                                                            onclick="openEditModal({{ $point->id }}, '{{ $point->category }}', @js($point->name), @js($point->instruction ?? ''), {{ $point->sequence }}, '{{ $point->frequency_type ?? '' }}', {{ $point->frequency_value ?? 1 }}, '{{ $point->photo ? asset('public-storage/' . $point->photo) : '' }}', {{ $point->standard_id ?: 'null' }}, {{ $point->duration ?: 'null' }})"
                                                             class="bg-yellow-600 hover:bg-yellow-700 text-white px-2 py-1 rounded text-xs">
                                                             Edit
                                                         </button>

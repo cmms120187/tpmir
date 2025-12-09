@@ -394,11 +394,11 @@ machineSearch.addEventListener('input', function() {
     }
 
     const filtered = machines.filter(m =>
-        m.idMachine.toLowerCase().includes(searchTerm) ||
-        m.machineType.toLowerCase().includes(searchTerm) ||
-        m.plant.toLowerCase().includes(searchTerm) ||
-        m.process.toLowerCase().includes(searchTerm) ||
-        m.line.toLowerCase().includes(searchTerm)
+        (m.idMachine && m.idMachine.toLowerCase().includes(searchTerm)) ||
+        (m.type_name && m.type_name.toLowerCase().includes(searchTerm)) ||
+        (m.plant_name && m.plant_name.toLowerCase().includes(searchTerm)) ||
+        (m.process_name && m.process_name.toLowerCase().includes(searchTerm)) ||
+        (m.line_name && m.line_name.toLowerCase().includes(searchTerm))
     );
 
     if (filtered.length === 0) {
@@ -408,14 +408,15 @@ machineSearch.addEventListener('input', function() {
     }
 
     machineDropdown.innerHTML = filtered.slice(0, 10).map(m => {
-        const info = `${m.machineType} - (${m.plant} / ${m.process} / ${m.line})`;
+        const info = `${m.type_name || '-'} - (${m.plant_name || '-'} / ${m.process_name || '-'} / ${m.line_name || '-'})`;
         // Escape untuk mencegah parsing error
-        const idMachineEscaped = String(m.idMachine).replace(/'/g, "\\'").replace(/"/g, '\\"');
+        const idMachineEscaped = String(m.idMachine || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
         const infoEscaped = String(info).replace(/'/g, "\\'").replace(/"/g, '\\"');
+        const machineId = m.machine_id || '';
         return `
         <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-             onclick="selectMachine(${m.id}, '${idMachineEscaped}', '${infoEscaped}')">
-            <div class="font-semibold text-gray-900">${m.idMachine}</div>
+             onclick="selectMachine('${machineId}', '${idMachineEscaped}', '${infoEscaped}')">
+            <div class="font-semibold text-gray-900">${m.idMachine || '-'}</div>
             <div class="text-xs text-gray-500">${info}</div>
         </div>
     `;
@@ -426,7 +427,14 @@ machineSearch.addEventListener('input', function() {
 
 // Select machine
 window.selectMachine = function(id, idMachine, info) {
-    machineId.value = id;
+    // id bisa string atau number, pastikan diisi
+    if (id && id !== '') {
+        machineId.value = id;
+    } else {
+        // Jika tidak ada machine_id, cari dari Machine table berdasarkan idMachine
+        // Atau biarkan kosong jika memang tidak ada di Machine table
+        machineId.value = '';
+    }
     machineSearch.value = idMachine;
     selectedMachineId.textContent = idMachine;
     selectedMachineInfo.textContent = info;
@@ -495,12 +503,16 @@ window.startBarcodeScanner = async function() {
                 const scannedCode = result.getText();
                 barcodeStatus.textContent = 'Barcode terdeteksi: ' + scannedCode;
 
-                // Find machine by ID
-                const foundMachine = machines.find(m => m.idMachine === scannedCode);
+                // Find machine by ID Machine
+                const foundMachine = machines.find(m => m.idMachine && m.idMachine.toLowerCase() === scannedCode.toLowerCase());
 
                 if (foundMachine) {
-                    const machineInfo = foundMachine.machineType + ' - (' + foundMachine.plant + ' / ' + foundMachine.process + ' / ' + foundMachine.line + ')';
-                    selectMachine(foundMachine.id, foundMachine.idMachine, machineInfo);
+                    const machineInfo = (foundMachine.type_name || '-') + ' - (' + 
+                                       (foundMachine.plant_name || '-') + ' / ' + 
+                                       (foundMachine.process_name || '-') + ' / ' + 
+                                       (foundMachine.line_name || '-') + ')';
+                    const machineId = foundMachine.machine_id || '';
+                    selectMachine(machineId, foundMachine.idMachine, machineInfo);
                     stopBarcodeScanner();
                     barcodeModal.classList.add('hidden');
                 } else {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Downtime;
 use App\Models\DowntimeErp;
+use App\Models\DowntimeErp2;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -18,10 +19,36 @@ class RootCauseAnalysisController extends Controller
         // Default to "all" for month and year
         $selectedMonth = $request->input('month', 'all');
         $selectedYear = $request->input('year', 'all');
-        $dataSource = $request->input('data_source', 'downtime'); // 'downtime' or 'downtime_erp'
+        $dataSource = $request->input('data_source', 'downtime_erp2'); // 'downtime', 'downtime_erp', or 'downtime_erp2'
         
         // Build base query
-        if ($dataSource === 'downtime_erp') {
+        if ($dataSource === 'downtime_erp2') {
+            $baseQuery = DowntimeErp2::query();
+            
+            // Apply year filter if not "all"
+            if ($selectedYear !== 'all') {
+                $baseQuery->whereYear('date', $selectedYear);
+            }
+            
+            // Apply month filter if not "all"
+            if ($selectedMonth !== 'all') {
+                $baseQuery->whereMonth('date', $selectedMonth);
+            }
+            
+            // Get problem/reason analysis
+            $problemData = (clone $baseQuery)
+                ->select(
+                    'problemDowntime',
+                    DB::raw('SUM(CAST(duration AS DECIMAL(10,2))) as total_duration'),
+                    DB::raw('COUNT(*) as frequency')
+                )
+                ->whereNotNull('problemDowntime')
+                ->where('problemDowntime', '!=', '')
+                ->groupBy('problemDowntime')
+                ->orderByDesc('frequency')
+                ->orderByDesc('total_duration')
+                ->get();
+        } elseif ($dataSource === 'downtime_erp') {
             $baseQuery = DowntimeErp::query();
             
             // Apply year filter if not "all"

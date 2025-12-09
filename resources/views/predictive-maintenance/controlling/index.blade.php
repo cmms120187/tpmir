@@ -35,6 +35,25 @@
                         Filter
                     </button>
                 </form>
+                <!-- Import/Export Buttons -->
+                <div class="flex items-center gap-2">
+                    <a href="{{ route('predictive-maintenance.controlling.export', ['month' => $filterMonth, 'year' => $filterYear]) }}" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded shadow transition flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Export Excel
+                    </a>
+                    <form action="{{ route('predictive-maintenance.controlling.import') }}" method="POST" enctype="multipart/form-data" class="inline">
+                        @csrf
+                        <label for="importFileInput" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded shadow transition flex items-center cursor-pointer">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            Import Excel
+                            <input type="file" id="importFileInput" name="excel_file" accept=".xlsx,.xls" class="hidden" onchange="this.form.submit()">
+                        </label>
+                    </form>
+                </div>
                 <a href="{{ route('predictive-maintenance.controlling.create') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow transition flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                     Create Execution
@@ -45,6 +64,23 @@
         @if(session('success'))
             <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
                 {{ session('success') }}
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                {{ session('error') }}
+            </div>
+        @endif
+
+        @if(session('import_errors') && count(session('import_errors')) > 0)
+            <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+                <p class="font-semibold">Import Errors:</p>
+                <ul class="list-disc list-inside mt-2 text-sm">
+                    @foreach(session('import_errors') as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
             </div>
         @endif
 
@@ -127,7 +163,21 @@
                         <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider" style="width: 200px;">Nama Mesin</th>
                         <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider" style="width: 100px;">Plant</th>
                         <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider" style="width: 100px;">Line</th>
-                        <th class="px-3 py-3 text-center text-xs font-medium text-white uppercase tracking-wider" style="width: 120px;">Kondisi Mesin</th>
+                        @php
+                            // Get maximum number of maintenance points across all machines
+                            $maxPoints = 0;
+                            foreach($machinesData as $data) {
+                                $pointCount = count($data['maintenance_points_conditions'] ?? []);
+                                if ($pointCount > $maxPoints) {
+                                    $maxPoints = $pointCount;
+                                }
+                            }
+                        @endphp
+                        @for($i = 0; $i < $maxPoints; $i++)
+                            <th class="px-3 py-3 text-center text-xs font-medium text-white uppercase tracking-wider" style="width: 100px;">
+                                Point {{ $i + 1 }}
+                            </th>
+                        @endfor
                         <th class="px-3 py-3 text-center text-xs font-medium text-white uppercase tracking-wider" style="width: 100px;">Status (%)</th>
                         <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider" style="width: 250px;">Tanggal Schedule</th>
                         <th class="px-3 py-3 text-center text-xs font-medium text-white uppercase tracking-wider" style="width: 120px;">Actions</th>
@@ -156,34 +206,40 @@
                         <td class="px-3 py-3 text-sm text-gray-500" style="word-wrap: break-word; overflow-wrap: break-word;">
                             {{ $machine->line_name ?? '-' }}
                         </td>
-                        <td class="px-3 py-3 text-center">
-                            @php
-                                $machineCondition = $data['machine_condition'] ?? 'no_data';
-                            @endphp
-                            <div class="flex flex-col items-center">
-                                @if($machineCondition == 'normal')
-                                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-100 border border-green-300">
-                                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
-                                        <span class="text-xs font-semibold text-green-800">Aman</span>
-                                    </div>
-                                @elseif($machineCondition == 'warning')
-                                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-100 border border-yellow-300">
-                                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-                                        <span class="text-xs font-semibold text-yellow-800">Perlu Perhatian</span>
-                                    </div>
-                                @elseif($machineCondition == 'critical')
-                                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-100 border border-red-300">
-                                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
-                                        <span class="text-xs font-semibold text-red-800">Kritis</span>
+                        @php
+                            $pointsConditions = $data['maintenance_points_conditions'] ?? [];
+                        @endphp
+                        @for($i = 0; $i < $maxPoints; $i++)
+                            <td class="px-3 py-3 text-center">
+                                @if(isset($pointsConditions[$i]))
+                                    @php
+                                        $pointCondition = $pointsConditions[$i]['condition'] ?? 'no_data';
+                                        $pointName = $pointsConditions[$i]['point_name'] ?? 'Point ' . ($i + 1);
+                                    @endphp
+                                    <div class="flex flex-col items-center" title="{{ $pointName }}">
+                                        @if($pointCondition == 'normal')
+                                            <div class="w-6 h-6 rounded-full bg-green-500 border-2 border-green-700" title="{{ $pointName }} - Aman"></div>
+                                        @elseif($pointCondition == 'warning')
+                                            <div class="w-6 h-6 rounded-full bg-yellow-500 border-2 border-yellow-700" title="{{ $pointName }} - Perlu Perhatian"></div>
+                                        @elseif($pointCondition == 'caution')
+                                            <div class="w-6 h-6 rounded-full bg-orange-500 border-2 border-orange-700" title="{{ $pointName }} - Perlu Pengawasan"></div>
+                                        @elseif($pointCondition == 'critical')
+                                            <div class="w-6 h-6 rounded-full bg-red-500 border-2 border-red-700" title="{{ $pointName }} - Perlu Perbaikan"></div>
+                                        @else
+                                            <div class="w-6 h-6 rounded-full bg-gray-400 border-2 border-gray-600" title="{{ $pointName }} - Belum Ada Data"></div>
+                                        @endif
+                                        <span class="text-xs text-gray-500 mt-1 truncate max-w-[80px]" title="{{ $pointName }}">
+                                            {{ Str::limit($pointName, 10) }}
+                                        </span>
                                     </div>
                                 @else
-                                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 border border-gray-300">
-                                        <div class="w-3 h-3 rounded-full bg-gray-400"></div>
-                                        <span class="text-xs font-semibold text-gray-600">Belum Ada Data</span>
+                                    <div class="flex flex-col items-center">
+                                        <div class="w-6 h-6 rounded-full bg-gray-200 border-2 border-gray-400"></div>
+                                        <span class="text-xs text-gray-400 mt-1">-</span>
                                     </div>
                                 @endif
-                            </div>
-                        </td>
+                            </td>
+                        @endfor
                         <td class="px-3 py-3 text-center">
                             <div class="flex flex-col items-center">
                                 <div class="w-full bg-gray-200 rounded-full h-6 mb-1 relative">

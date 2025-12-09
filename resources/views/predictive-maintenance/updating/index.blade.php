@@ -246,32 +246,53 @@ function showMaintenancePoints(machineId, scheduledDate) {
                     measurementStatusBadge = `<span class="ml-2 px-2 py-1 text-xs font-semibold rounded-full ${statusColors[point.measurement_status] || 'bg-gray-100 text-gray-800'}">${statusText[point.measurement_status] || point.measurement_status}</span>`;
                 }
 
+                let photoHtml = '';
+                if (point.photo) {
+                    photoHtml = `<img src="${point.photo}" alt="Photo" class="w-16 h-16 object-cover rounded border float-left mr-3">`;
+                }
+
                 html += `
                     <div class="border rounded p-4 bg-white">
-                        <div class="flex items-start justify-between mb-2">
-                            <div class="flex-1">
-                                <h4 class="font-semibold text-gray-900">${point.maintenance_point_name}</h4>
-                                ${point.standard_name && point.standard_name !== '-' ? `
-                                    <div class="mt-1 text-sm text-blue-600">
-                                        <strong>Standard:</strong> ${point.standard_name}
-                                        ${point.standard_min !== null && point.standard_max !== null ? ` (${point.standard_min} - ${point.standard_max} ${point.standard_unit || ''})` : ''}
+                        <div class="flex items-start gap-3">
+                            ${photoHtml}
+                            <div class="flex-1 ${point.photo ? 'ml-0' : ''}">
+                                <div class="flex items-start justify-between mb-2">
+                                    <div class="flex-1">
+                                        <h4 class="font-semibold text-gray-900">${point.maintenance_point_name}</h4>
+                                        ${point.standard_name && point.standard_name !== '-' ? `
+                                            <div class="mt-1 text-sm text-blue-600">
+                                                <strong>Standard:</strong> ${point.standard_name}
+                                                ${point.standard_min !== null && point.standard_max !== null ? ` (${point.standard_min} - ${point.standard_max} ${point.standard_unit || ''})` : ''}
+                                            </div>
+                                        ` : ''}
+                                        ${point.instruction ? `<p class="text-sm text-gray-600 mt-1">${point.instruction}</p>` : ''}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">${point.status}</span>
+                                        ${measurementStatusBadge}
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600 mt-3">
+                                    <div><strong>Measured Value:</strong> ${point.measured_value !== null ? point.measured_value + ' ' + (point.standard_unit || '') : '-'}</div>
+                                    <div><strong>Performed By:</strong> ${point.performed_by || '-'}</div>
+                                    <div><strong>Start Time:</strong> ${point.actual_start_time || '-'}</div>
+                                    <div><strong>End Time:</strong> ${point.actual_end_time || '-'}</div>
+                                </div>
+                                ${point.execution_id ? `
+                                    <div class="mt-3">
+                                        <a href="{{ url('predictive-maintenance/updating') }}/${point.execution_id}/edit"
+                                           class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                            Edit
+                                        </a>
                                     </div>
                                 ` : ''}
-                                ${point.instruction ? `<p class="text-sm text-gray-600 mt-1">${point.instruction}</p>` : ''}
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">${point.status}</span>
-                                ${measurementStatusBadge}
                             </div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600 mt-3">
-                            <div><strong>Measured Value:</strong> ${point.measured_value !== null ? point.measured_value + ' ' + (point.standard_unit || '') : '-'}</div>
-                            <div><strong>Performed By:</strong> ${point.performed_by || '-'}</div>
-                            <div><strong>Start Time:</strong> ${point.actual_start_time || '-'}</div>
-                            <div><strong>End Time:</strong> ${point.actual_end_time || '-'}</div>
-                        </div>
-                        ${point.execution_id ? `
-                            <div class="mt-3">
+                    </div>
+                `;
                                 <a href="{{ url('predictive-maintenance/updating') }}/${point.execution_id}/edit"
                                    class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">

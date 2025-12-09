@@ -138,99 +138,116 @@ class ReportingController extends Controller
         $machineId = $request->get('machine_id');
         $status = $request->get('status');
         
-        $query = PreventiveMaintenanceExecution::with(['schedule.machineErp', 'performedBy'])
+        // Get ALL executions (not filtered by status) - IMPORTANT: 1 jadwal = 1 execution (latest)
+        $allExecutionsQuery = PreventiveMaintenanceExecution::with(['schedule.machineErp', 'performedBy'])
             ->whereBetween('scheduled_date', [$startDate, $endDate]);
         
         if ($machineId) {
-            $query->whereHas('schedule', function($q) use ($machineId) {
+            $allExecutionsQuery->whereHas('schedule', function($q) use ($machineId) {
                 $q->where('machine_erp_id', $machineId);
             });
         }
         
-        if ($status) {
-            $query->where('status', $status);
-        }
+        $allExecutionsRaw = $allExecutionsQuery->orderBy('scheduled_date', 'asc')->orderBy('created_at', 'desc')->get();
         
-        $executions = $query->orderBy('scheduled_date', 'desc')->paginate(12);
-        $executions->appends($request->except('page'));
-        $machines = MachineErp::all();
-        
-        // Group executions by (machine_erp_id, scheduled_date) to get unique jadwal for statistics
-        $jadwalData = [];
-        foreach ($executions as $execution) {
-            $machineId = $execution->schedule->machine_erp_id;
+        // Group ALL executions by (machine_erp_id, scheduled_date)
+        // For each jadwal, use only the LATEST execution (1 jadwal = 1 execution)
+        $jadwalByMachineAndDate = [];
+        foreach ($allExecutionsRaw as $execution) {
+            $machineIdKey = $execution->schedule->machine_erp_id;
             $scheduledDate = $execution->scheduled_date;
             if (is_string($scheduledDate)) {
                 $dateFormatted = $scheduledDate;
             } else {
                 $dateFormatted = Carbon::parse($scheduledDate)->format('Y-m-d');
             }
-            $key = $machineId . '_' . $dateFormatted;
+            $key = $machineIdKey . '_' . $dateFormatted;
             
-            if (!isset($jadwalData[$key])) {
-                $jadwalData[$key] = [
-                    'machine_id' => $machineId,
+            // For each jadwal, only keep the latest execution (most recent created_at)
+            if (!isset($jadwalByMachineAndDate[$key])) {
+                $jadwalByMachineAndDate[$key] = [
+                    'machine_id' => $machineIdKey,
                     'scheduled_date' => $dateFormatted,
-                    'executions' => [],
-                    'status' => 'pending',
+                    'latest_execution' => $execution,
                 ];
-            }
-            $jadwalData[$key]['executions'][] = $execution;
-            
-            // Update status: if any execution is completed, set status to completed
-            // Priority: completed > in_progress > pending
-            if ($execution->status == 'completed') {
-                $jadwalData[$key]['status'] = 'completed';
-            } elseif ($execution->status == 'in_progress' && $jadwalData[$key]['status'] != 'completed') {
-                $jadwalData[$key]['status'] = 'in_progress';
+            } else {
+                // Update if this execution is newer (later created_at)
+                if ($execution->created_at > $jadwalByMachineAndDate[$key]['latest_execution']->created_at) {
+                    $jadwalByMachineAndDate[$key]['latest_execution'] = $execution;
+                }
             }
         }
         
-        // Calculate statistics based on jadwal (not individual executions)
-        $totalJadwal = count($jadwalData);
+        // Calculate statistics based on latest execution status for each jadwal
+        $totalJadwal = count($jadwalByMachineAndDate);
         $completedJadwal = 0;
         $pendingJadwal = 0;
         $inProgressJadwal = 0;
         
-        foreach ($jadwalData as $jadwal) {
-            if ($jadwal['status'] == 'completed') {
+        foreach ($jadwalByMachineAndDate as $key => $jadwal) {
+            $latestExecution = $jadwal['latest_execution'];
+            
+            if ($latestExecution->status == 'completed') {
                 $completedJadwal++;
-            } elseif ($jadwal['status'] == 'in_progress') {
+            } elseif ($latestExecution->status == 'in_progress') {
                 $inProgressJadwal++;
-            } else {
+            } elseif ($latestExecution->status == 'pending') {
                 $pendingJadwal++;
             }
         }
         
-        // For cost and duration, still use individual executions (get all, not paginated)
-        $allExecutionsQuery = PreventiveMaintenanceExecution::with(['schedule.machine', 'performedBy'])
-            ->whereBetween('scheduled_date', [$startDate, $endDate]);
-        
-        if ($machineId) {
-            $allExecutionsQuery->whereHas('schedule', function($q) use ($machineId) {
-                $q->where('machine_id', $machineId);
-            });
+        // Filter executions to display: use latest execution for each jadwal
+        $executionsToDisplay = [];
+        foreach ($jadwalByMachineAndDate as $key => $jadwal) {
+            $latestExecution = $jadwal['latest_execution'];
+            
+            // Apply status filter if specified
+            if ($status && $latestExecution->status != $status) {
+                continue;
+            }
+            
+            $executionsToDisplay[] = $latestExecution;
         }
         
-        if ($status) {
-            $allExecutionsQuery->where('status', $status);
+        // For cost and duration, use completed executions only (latest for each jadwal)
+        $completedExecutions = [];
+        foreach ($jadwalByMachineAndDate as $key => $jadwal) {
+            $latestExecution = $jadwal['latest_execution'];
+            if ($latestExecution->status == 'completed') {
+                $completedExecutions[] = $latestExecution;
+            }
         }
-        
-        $completedExecutions = $allExecutionsQuery->where('status', 'completed')->get();
         
         // Statistics
         $stats = [
-            'total' => $totalJadwal, // Jumlah jadwal (tanggal)
-            'completed' => $completedJadwal, // Jumlah jadwal completed
-            'pending' => $pendingJadwal, // Jumlah jadwal pending
-            'in_progress' => $inProgressJadwal, // Jumlah jadwal in_progress
-            'total_cost' => $completedExecutions->sum('cost'),
-            'avg_duration' => $completedExecutions
-                ->filter(function($e) {
-                    return $e->duration !== null;
-                })
-                ->avg('duration'),
+            'total' => $totalJadwal,
+            'completed' => $completedJadwal,
+            'pending' => $pendingJadwal,
+            'in_progress' => $inProgressJadwal,
+            'total_cost' => collect($completedExecutions)->sum('cost'),
+            'avg_duration' => collect($completedExecutions)->avg(function($execution) {
+                if ($execution->actual_start_time && $execution->actual_end_time) {
+                    return $execution->actual_start_time->diffInMinutes($execution->actual_end_time);
+                }
+                return null;
+            }),
         ];
+        
+        // Paginate executions
+        $executionsCollection = collect($executionsToDisplay);
+        $currentPage = \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPage();
+        $perPage = 12;
+        $currentItems = $executionsCollection->slice(($currentPage - 1) * $perPage, $perPage)->all();
+        $executions = new \Illuminate\Pagination\LengthAwarePaginator(
+            $currentItems,
+            $executionsCollection->count(),
+            $perPage,
+            $currentPage,
+            ['path' => \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPath()]
+        );
+        $executions->appends($request->except('page'));
+        
+        $machines = MachineErp::all();
         
         return view('preventive-maintenance.reporting.execution', compact('executions', 'machines', 'startDate', 'endDate', 'machineId', 'status', 'stats'));
     }

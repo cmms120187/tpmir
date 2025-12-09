@@ -127,7 +127,7 @@
                             <div class="space-y-4">
                                 @foreach($activity->photos as $photo)
                                     <div class="relative">
-                                        <img src="{{ Storage::url($photo) }}" alt="Activity Photo" class="w-full h-auto object-cover rounded-lg border shadow">
+                                        <img src="{{ asset('storage/' . $photo) }}" alt="Activity Photo" class="w-full h-auto object-cover rounded-lg border shadow" onerror="this.src='{{ asset('images/placeholder.jpg') }}'; this.onerror=null;">
                                     </div>
                                 @endforeach
                             </div>

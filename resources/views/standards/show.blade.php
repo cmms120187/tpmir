@@ -152,8 +152,25 @@
                     <label class="block text-sm font-medium text-gray-500 mb-2">Photos</label>
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
                         @foreach($standard->photos as $photo)
+                            @php
+                                // Cek apakah file dengan path asli ada
+                                $photoPath = $photo->photo_path;
+                                $actualPath = $photoPath;
+                                
+                                // Jika file tidak ada, coba cari dengan ekstensi .webp
+                                if (!Storage::disk('public')->exists($photoPath)) {
+                                    $pathInfo = pathinfo($photoPath);
+                                    $webpPath = ($pathInfo['dirname'] !== '.' ? $pathInfo['dirname'] . '/' : '') . $pathInfo['filename'] . '.webp';
+                                    if (Storage::disk('public')->exists($webpPath)) {
+                                        $actualPath = $webpPath;
+                                    }
+                                }
+                            @endphp
                             <div>
-                                <img src="{{ Storage::url($photo->photo_path) }}" alt="{{ $photo->name ?? $standard->name }}" class="w-full h-48 object-cover rounded border">
+                                <img src="{{ asset('public-storage/' . $actualPath) }}" alt="{{ $photo->name ?? $standard->name }}" class="w-full h-48 object-cover rounded border" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                <div class="w-full h-48 bg-gray-200 rounded border flex items-center justify-center hidden">
+                                    <span class="text-xs text-gray-500">No Image</span>
+                                </div>
                                 @if($photo->name)
                                     <p class="text-xs text-gray-600 mt-1 text-center">{{ $photo->name }}</p>
                                 @endif
@@ -164,7 +181,24 @@
                 @elseif($standard->photo)
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-500 mb-1">Photo</label>
-                    <img src="{{ Storage::url($standard->photo) }}" alt="{{ $standard->name }}" class="w-48 h-48 object-cover rounded border">
+                    @php
+                        // Cek apakah file dengan path asli ada
+                        $photoPath = $standard->photo;
+                        $actualPath = $photoPath;
+                        
+                        // Jika file tidak ada, coba cari dengan ekstensi .webp
+                        if (!Storage::disk('public')->exists($photoPath)) {
+                            $pathInfo = pathinfo($photoPath);
+                            $webpPath = ($pathInfo['dirname'] !== '.' ? $pathInfo['dirname'] . '/' : '') . $pathInfo['filename'] . '.webp';
+                            if (Storage::disk('public')->exists($webpPath)) {
+                                $actualPath = $webpPath;
+                            }
+                        }
+                    @endphp
+                    <img src="{{ asset('public-storage/' . $actualPath) }}" alt="{{ $standard->name }}" class="w-48 h-48 object-cover rounded border" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="w-48 h-48 bg-gray-200 rounded border flex items-center justify-center hidden">
+                        <span class="text-xs text-gray-500">No Image</span>
+                    </div>
                 </div>
                 @endif
                 

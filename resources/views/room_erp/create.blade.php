@@ -73,12 +73,12 @@
 
                 <div>
                     <label for="line_name" class="block text-sm font-semibold text-gray-700 mb-2">Line Name</label>
-                    <input type="text" 
-                           name="line_name" 
-                           id="line_name" 
-                           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('line_name') border-red-500 @enderror" 
-                           value="{{ old('line_name') }}" 
-                           placeholder="Enter line name">
+                    <select id="line_name" 
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('line_name') border-red-500 @enderror"
+                            disabled>
+                        <option value="">Pilih Category terlebih dahulu</option>
+                    </select>
+                    <input type="hidden" name="line_name" id="line_name_hidden" value="{{ old('line_name') }}">
                     @error('line_name')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                     @enderror
@@ -122,5 +122,91 @@
         </form>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const categorySelect = document.getElementById('category');
+    const lineSelect = document.getElementById('line_name');
+    const lineHidden = document.getElementById('line_name_hidden');
+    const processNameInput = document.getElementById('process_name');
+    const plantNameInput = document.getElementById('plant_name');
+    const lines = @json($lines ?? []);
+
+    categorySelect.addEventListener('change', function() {
+        const selectedCategory = this.value;
+        
+        // Clear previous options and related fields
+        lineSelect.innerHTML = '<option value="">Pilih Line</option>';
+        lineHidden.value = '';
+        processNameInput.value = '';
+        plantNameInput.value = '';
+        
+        if (selectedCategory && selectedCategory !== '') {
+            // Enable line select
+            lineSelect.disabled = false;
+            
+            // Show all lines when category is selected
+            lines.forEach(function(line) {
+                const option = document.createElement('option');
+                option.value = line.name;
+                
+                // Format display: "Line Name, Plant Name-Process Name"
+                const plantName = line.plant ? (line.plant.name || '') : '';
+                const processName = line.process ? (line.process.name || '') : '';
+                let displayText = line.name;
+                
+                if (plantName || processName) {
+                    const parts = [];
+                    if (plantName) parts.push(plantName);
+                    if (processName) parts.push(processName);
+                    displayText = line.name + ', ' + parts.join('-');
+                }
+                
+                option.textContent = displayText;
+                
+                // Store full line data in data attributes
+                option.setAttribute('data-process-name', processName);
+                option.setAttribute('data-plant-name', plantName);
+                
+                if (line.name === '{{ old('line_name') }}') {
+                    option.selected = true;
+                    lineHidden.value = line.name;
+                    // Auto-fill process and plant if line is pre-selected
+                    if (processName) {
+                        processNameInput.value = processName;
+                    }
+                    if (plantName) {
+                        plantNameInput.value = plantName;
+                    }
+                }
+                lineSelect.appendChild(option);
+            });
+        } else {
+            // Disable line select if no category selected
+            lineSelect.disabled = true;
+            lineSelect.innerHTML = '<option value="">Pilih Category terlebih dahulu</option>';
+        }
+    });
+    
+    // Update hidden input and auto-fill process/plant when line is selected
+    lineSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        lineHidden.value = this.value;
+        
+        // Auto-fill process name
+        const processName = selectedOption.getAttribute('data-process-name') || '';
+        processNameInput.value = processName;
+        
+        // Auto-fill plant name
+        const plantName = selectedOption.getAttribute('data-plant-name') || '';
+        plantNameInput.value = plantName;
+    });
+    
+    // Initialize on page load if category is already selected
+    if (categorySelect.value) {
+        categorySelect.dispatchEvent(new Event('change'));
+    }
+});
+</script>
 @endsection
 

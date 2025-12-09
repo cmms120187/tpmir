@@ -55,6 +55,12 @@ class StandardController extends Controller
             'machine_type_ids' => 'nullable|array',
             'machine_type_ids.*' => 'exists:machine_types,id',
             'status' => 'required|in:active,inactive',
+            'variants' => 'nullable|array|max:4',
+            'variants.*.name' => 'required|string|max:255',
+            'variants.*.min_value' => 'required|numeric',
+            'variants.*.max_value' => 'required|numeric',
+            'variants.*.color' => 'required|string|max:7',
+            'variants.*.order' => 'required|integer|min:1',
         ]);
 
         // Handle photo upload (legacy single photo)
@@ -104,6 +110,20 @@ class StandardController extends Controller
             $standard->photos()->syncWithoutDetaching([$newPhotoId]);
         }
 
+        // Handle variants (for new standard, all variants are new)
+        if ($request->has('variants') && is_array($request->variants)) {
+            foreach ($request->variants as $variantData) {
+                \App\Models\StandardVariant::create([
+                    'standard_id' => $standard->id,
+                    'name' => $variantData['name'],
+                    'min_value' => $variantData['min_value'],
+                    'max_value' => $variantData['max_value'],
+                    'color' => $variantData['color'],
+                    'order' => $variantData['order'],
+                ]);
+            }
+        }
+
         return redirect()->route('standards.index')
             ->with('success', 'Standard berhasil dibuat.');
     }
@@ -151,6 +171,13 @@ class StandardController extends Controller
             'machine_type_ids' => 'nullable|array',
             'machine_type_ids.*' => 'exists:machine_types,id',
             'status' => 'required|in:active,inactive',
+            'variants' => 'nullable|array|max:4',
+            'variants.*.name' => 'required|string|max:255',
+            'variants.*.min_value' => 'required|numeric',
+            'variants.*.max_value' => 'required|numeric',
+            'variants.*.color' => 'required|string|max:7',
+            'variants.*.order' => 'required|integer|min:1',
+            'variants.*.id' => 'nullable|exists:standard_variants,id',
         ]);
 
         $standard = Standard::with('photos')->findOrFail($id);
@@ -206,6 +233,45 @@ class StandardController extends Controller
         // Attach new photo if uploaded
         if ($newPhotoId) {
             $standard->photos()->syncWithoutDetaching([$newPhotoId]);
+        }
+
+        // Handle variants
+        if ($request->has('variants') && is_array($request->variants)) {
+            $variantIds = [];
+            foreach ($request->variants as $variantData) {
+                if (isset($variantData['id']) && $variantData['id']) {
+                    // Update existing variant
+                    $variant = \App\Models\StandardVariant::find($variantData['id']);
+                    if ($variant && $variant->standard_id == $standard->id) {
+                        $variant->update([
+                            'name' => $variantData['name'],
+                            'min_value' => $variantData['min_value'],
+                            'max_value' => $variantData['max_value'],
+                            'color' => $variantData['color'],
+                            'order' => $variantData['order'],
+                        ]);
+                        $variantIds[] = $variant->id;
+                    }
+                } else {
+                    // Create new variant
+                    $variant = \App\Models\StandardVariant::create([
+                        'standard_id' => $standard->id,
+                        'name' => $variantData['name'],
+                        'min_value' => $variantData['min_value'],
+                        'max_value' => $variantData['max_value'],
+                        'color' => $variantData['color'],
+                        'order' => $variantData['order'],
+                    ]);
+                    $variantIds[] = $variant->id;
+                }
+            }
+            // Delete variants that are not in the request
+            \App\Models\StandardVariant::where('standard_id', $standard->id)
+                ->whereNotIn('id', $variantIds)
+                ->delete();
+        } else {
+            // If no variants provided, delete all existing variants
+            \App\Models\StandardVariant::where('standard_id', $standard->id)->delete();
         }
 
         return redirect()->route('standards.index')

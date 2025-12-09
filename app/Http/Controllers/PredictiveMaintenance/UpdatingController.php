@@ -17,9 +17,9 @@ class UpdatingController extends Controller
      */
     public function index()
     {
-        // Get executions with status pending or in_progress
-        $query = PredictiveMaintenanceExecution::whereIn('status', ['pending', 'in_progress'])
-            ->with(['schedule.machineErp.machineType', 'schedule.machineErp.roomErp', 'schedule.standard', 'performedBy', 'schedule']);
+        // Get all executions (not just pending/in_progress) to check if jadwal is fully completed
+        // IMPORTANT: 1 jadwal (schedule_id + scheduled_date) = 1 execution (latest status)
+        $query = PredictiveMaintenanceExecution::with(['schedule.machineErp.machineType', 'schedule.machineErp.roomErp', 'schedule.standard', 'performedBy', 'schedule']);
         
         // Filter by user role (mekanik only sees their own assigned executions)
         if (DataFilterHelper::shouldFilterRoute(request()->route()->getName())) {
@@ -29,11 +29,12 @@ class UpdatingController extends Controller
             }
         }
         
-        $executionsRaw = $query->orderBy('scheduled_date', 'asc')->get();
+        $allExecutions = $query->orderBy('scheduled_date', 'asc')->orderBy('created_at', 'desc')->get();
         
-        // Group by (machine_erp_id, scheduled_date) to get unique jadwal
-        $jadwalData = [];
-        foreach ($executionsRaw as $execution) {
+        // Group all executions by (machine_erp_id, scheduled_date) 
+        // For each jadwal, use only the LATEST execution (1 jadwal = 1 execution)
+        $allJadwalData = [];
+        foreach ($allExecutions as $execution) {
             $machineId = $execution->schedule->machine_erp_id;
             $scheduledDate = $execution->scheduled_date;
             if (is_string($scheduledDate)) {
@@ -43,19 +44,61 @@ class UpdatingController extends Controller
             }
             $key = $machineId . '_' . $dateFormatted;
             
-            if (!isset($jadwalData[$key])) {
-                $jadwalData[$key] = [
+            // For each jadwal, only keep the latest execution (most recent created_at)
+            if (!isset($allJadwalData[$key])) {
+                $allJadwalData[$key] = [
                     'machine_id' => $machineId,
                     'machine' => $execution->schedule->machineErp,
                     'scheduled_date' => $dateFormatted,
-                    'executions' => [],
-                    'status' => 'pending',
+                    'latest_execution' => $execution, // Store only the latest execution
+                    'has_pending' => false,
+                    'has_in_progress' => false,
+                    'has_completed' => false,
                 ];
+            } else {
+                // Update if this execution is newer (later created_at)
+                if ($execution->created_at > $allJadwalData[$key]['latest_execution']->created_at) {
+                    $allJadwalData[$key]['latest_execution'] = $execution;
+                }
             }
-            $jadwalData[$key]['executions'][] = $execution;
             
-            if ($execution->status == 'in_progress') {
-                $jadwalData[$key]['status'] = 'in_progress';
+            // Update status flags based on latest execution
+            $latestExec = $allJadwalData[$key]['latest_execution'];
+            if ($latestExec->status == 'pending') {
+                $allJadwalData[$key]['has_pending'] = true;
+                $allJadwalData[$key]['has_in_progress'] = false;
+                $allJadwalData[$key]['has_completed'] = false;
+            } elseif ($latestExec->status == 'in_progress') {
+                $allJadwalData[$key]['has_in_progress'] = true;
+                $allJadwalData[$key]['has_pending'] = false;
+                $allJadwalData[$key]['has_completed'] = false;
+            } elseif ($latestExec->status == 'completed') {
+                $allJadwalData[$key]['has_completed'] = true;
+                $allJadwalData[$key]['has_pending'] = false;
+                $allJadwalData[$key]['has_in_progress'] = false;
+            }
+        }
+        
+        // Filter: only include jadwal that have pending or in_progress status (latest execution)
+        // Exclude jadwal that already have completed status (completed is the latest update)
+        $jadwalData = [];
+        foreach ($allJadwalData as $key => $jadwal) {
+            $latestExecution = $jadwal['latest_execution'];
+            
+            // Skip jadwal that already has completed status (latest execution is completed)
+            if ($latestExecution->status == 'completed') {
+                continue;
+            }
+            
+            // Only include jadwal with pending or in_progress status (latest execution)
+            if ($latestExecution->status == 'pending' || $latestExecution->status == 'in_progress') {
+                $jadwalData[$key] = [
+                    'machine_id' => $jadwal['machine_id'],
+                    'machine' => $jadwal['machine'],
+                    'scheduled_date' => $jadwal['scheduled_date'],
+                    'executions' => [$latestExecution], // Only the latest execution
+                    'status' => $latestExecution->status,
+                ];
             }
         }
         
@@ -72,47 +115,27 @@ class UpdatingController extends Controller
             ['path' => \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPath()]
         );
         
-        // Get completed executions for information only - grouped by jadwal
-        $completedExecutionsRaw = PredictiveMaintenanceExecution::where('status', 'completed')
-            ->with(['schedule.machineErp.machineType', 'schedule.machineErp.roomErp', 'schedule.standard', 'performedBy', 'schedule'])
-            ->orderBy('actual_end_time', 'desc')
-            ->limit(100)
-            ->get();
-        
-        // Group completed by (machine_erp_id, scheduled_date)
+        // Get completed jadwal for information only - use latest execution for each jadwal
         $completedJadwal = [];
-        foreach ($completedExecutionsRaw as $execution) {
-            $machineId = $execution->schedule->machine_erp_id;
-            $scheduledDate = $execution->scheduled_date;
-            if (is_string($scheduledDate)) {
-                $dateFormatted = $scheduledDate;
-            } else {
-                $dateFormatted = \Carbon\Carbon::parse($scheduledDate)->format('Y-m-d');
-            }
-            $key = $machineId . '_' . $dateFormatted;
+        foreach ($allJadwalData as $key => $jadwal) {
+            $latestExecution = $jadwal['latest_execution'];
             
-            if (!isset($completedJadwal[$key])) {
+            // Only include jadwal where latest execution is completed
+            if ($latestExecution->status == 'completed') {
                 $completedJadwal[$key] = [
-                    'machine_id' => $machineId,
-                    'machine' => $execution->schedule->machineErp,
-                    'scheduled_date' => $dateFormatted,
-                    'executions' => [],
-                    'latest_end_time' => $execution->actual_end_time,
+                    'machine_id' => $jadwal['machine_id'],
+                    'machine' => $jadwal['machine'],
+                    'scheduled_date' => $jadwal['scheduled_date'],
+                    'executions' => [$latestExecution], // Only the latest execution
+                    'latest_end_time' => $latestExecution->actual_end_time,
                 ];
-            }
-            $completedJadwal[$key]['executions'][] = $execution;
-            
-            if ($execution->actual_end_time && 
-                (!$completedJadwal[$key]['latest_end_time'] || 
-                 \Carbon\Carbon::parse($execution->actual_end_time)->gt(\Carbon\Carbon::parse($completedJadwal[$key]['latest_end_time'])))) {
-                $completedJadwal[$key]['latest_end_time'] = $execution->actual_end_time;
             }
         }
         
         // Sort by latest_end_time and limit to 20
         usort($completedJadwal, function($a, $b) {
-            $timeA = $a['latest_end_time'] ? \Carbon\Carbon::parse($a['latest_end_time']) : \Carbon\Carbon::minValue();
-            $timeB = $b['latest_end_time'] ? \Carbon\Carbon::parse($b['latest_end_time']) : \Carbon\Carbon::minValue();
+            $timeA = $a['latest_end_time'] ? \Carbon\Carbon::parse($a['latest_end_time']) : \Carbon\Carbon::createFromTimestamp(0);
+            $timeB = $b['latest_end_time'] ? \Carbon\Carbon::parse($b['latest_end_time']) : \Carbon\Carbon::createFromTimestamp(0);
             return $timeB->gt($timeA) ? 1 : -1;
         });
         $completedJadwal = array_slice($completedJadwal, 0, 20);
@@ -133,9 +156,21 @@ class UpdatingController extends Controller
             ]
         );
         
-        // Statistics
-        $pendingCount = PredictiveMaintenanceExecution::where('status', 'pending')->count();
-        $inProgressCount = PredictiveMaintenanceExecution::where('status', 'in_progress')->count();
+        // Statistics - only count jadwal based on latest execution status
+        $pendingCount = 0;
+        $inProgressCount = 0;
+        
+        // Count based on latest execution status for each jadwal
+        foreach ($allJadwalData as $key => $jadwal) {
+            $latestExecution = $jadwal['latest_execution'];
+            
+            // Only count if latest execution is not completed
+            if ($latestExecution->status == 'pending') {
+                $pendingCount++;
+            } elseif ($latestExecution->status == 'in_progress') {
+                $inProgressCount++;
+            }
+        }
         
         // Count unique completed jadwal
         $completedJadwalCount = count($completedJadwal);
@@ -185,6 +220,7 @@ class UpdatingController extends Controller
                 'measured_value' => $execution->measured_value,
                 'measurement_status' => $execution->measurement_status,
                 'instruction' => $execution->schedule->maintenancePoint->instruction ?? $execution->schedule->description ?? '',
+                'photo' => $execution->schedule->maintenancePoint && $execution->schedule->maintenancePoint->photo ? asset('public-storage/' . $execution->schedule->maintenancePoint->photo) : null,
                 'status' => $execution->status,
                 'performed_by' => $execution->performedBy->name ?? '-',
                 'actual_start_time' => $execution->actual_start_time ? \Carbon\Carbon::parse($execution->actual_start_time)->format('d/m/Y H:i') : '-',
@@ -265,6 +301,11 @@ class UpdatingController extends Controller
         // Auto set end time if status changed to completed
         if ($validated['status'] == 'completed' && !$execution->actual_end_time) {
             $validated['actual_end_time'] = now();
+        }
+        
+        // Recalculate measurement_status if measured_value is provided and standard exists
+        if (isset($validated['measured_value']) && $execution->schedule && $execution->schedule->standard) {
+            $validated['measurement_status'] = $execution->schedule->standard->getMeasurementStatus($validated['measured_value']);
         }
         
         $execution->update($validated);

@@ -276,8 +276,9 @@
                             <select name="data_source" id="data_source" 
                                     onchange="document.getElementById('dataSourceForm').submit();"
                                     class="px-3 py-1.5 border border-gray-300 rounded shadow-sm bg-white text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all">
-                                <option value="downtime" {{ ($dataSource ?? 'downtime') === 'downtime' ? 'selected' : '' }}>Downtime</option>
-                                <option value="downtime_erp" {{ ($dataSource ?? 'downtime') === 'downtime_erp' ? 'selected' : '' }}>Downtime ERP</option>
+                                <option value="downtime_erp2" {{ ($dataSource ?? 'downtime_erp2') === 'downtime_erp2' ? 'selected' : '' }}>Downtime ERP2</option>
+                                <option value="downtime_erp" {{ ($dataSource ?? 'downtime_erp2') === 'downtime_erp' ? 'selected' : '' }}>Downtime ERP</option>
+                                <option value="downtime" {{ ($dataSource ?? 'downtime_erp2') === 'downtime' ? 'selected' : '' }}>Downtime</option>
                             </select>
                         </form>
                     </div>
@@ -788,19 +789,25 @@ document.addEventListener('DOMContentLoaded', function() {
                             enabled: true,
                             callbacks: {
                                 title: function(context) {
+                                    if (!context || !context[0] || context[0].dataIndex === undefined) {
+                                        return 'N/A';
+                                    }
                                     const index = context[0].dataIndex;
                                     return mttrLabels[index] || 'N/A';
                                 },
                                 label: function(context) {
+                                    if (!context || !context[0] || context[0].dataIndex === undefined) {
+                                        return [];
+                                    }
                                     const index = context[0].dataIndex;
-                                    const value = context.parsed.y || 0;
+                                    const value = context.parsed ? context.parsed.y : 0;
                                     return [
-                                        'Type Machine: ' + mttrTypes[index],
-                                        'Plant: ' + mttrPlants[index],
-                                        'Line: ' + mttrLines[index],
+                                        'Type Machine: ' + (mttrTypes[index] || 'N/A'),
+                                        'Plant: ' + (mttrPlants[index] || 'N/A'),
+                                        'Line: ' + (mttrLines[index] || 'N/A'),
                                         'MTTR: ' + Math.round(value) + ' minutes',
-                                        'Downtime Count: ' + mttrCounts[index] + 'x',
-                                        'Total Duration: ' + Math.round(mttrTotalDurations[index]) + ' minutes'
+                                        'Downtime Count: ' + (mttrCounts[index] || 0) + 'x',
+                                        'Total Duration: ' + Math.round(mttrTotalDurations[index] || 0) + ' minutes'
                                     ];
                                 }
                             }
@@ -883,20 +890,26 @@ document.addEventListener('DOMContentLoaded', function() {
                             enabled: true,
                             callbacks: {
                                 title: function(context) {
+                                    if (!context || !context[0] || context[0].dataIndex === undefined) {
+                                        return 'N/A';
+                                    }
                                     const index = context[0].dataIndex;
                                     return mtbfLabels[index] || 'N/A';
                                 },
                                 label: function(context) {
+                                    if (!context || !context[0] || context[0].dataIndex === undefined) {
+                                        return [];
+                                    }
                                     const index = context[0].dataIndex;
-                                    const value = context.parsed.y || 0;
+                                    const value = context.parsed ? context.parsed.y : 0;
                                     return [
-                                        'Type Machine: ' + mtbfTypes[index],
-                                        'Plant: ' + mtbfPlants[index],
-                                        'Line: ' + mtbfLines[index],
+                                        'Type Machine: ' + (mtbfTypes[index] || 'N/A'),
+                                        'Plant: ' + (mtbfPlants[index] || 'N/A'),
+                                        'Line: ' + (mtbfLines[index] || 'N/A'),
                                         'MTBF: ' + Math.round(value) + ' minutes',
-                                        'Failure Count: ' + mtbfCounts[index] + 'x',
-                                        'Total Downtime: ' + Math.round(mtbfTotalDurations[index]) + ' minutes',
-                                        'Operating Time: ' + Math.round(mtbfOperatingTimes[index]) + ' minutes'
+                                        'Failure Count: ' + (mtbfCounts[index] || 0) + 'x',
+                                        'Total Downtime: ' + Math.round(mtbfTotalDurations[index] || 0) + ' minutes',
+                                        'Operating Time: ' + Math.round(mtbfOperatingTimes[index] || 0) + ' minutes'
                                     ];
                                 }
                             }

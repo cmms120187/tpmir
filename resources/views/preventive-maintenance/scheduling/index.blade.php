@@ -59,10 +59,10 @@
                             {{ $machine->machineType->name ?? '-' }}
                         </td>
                         <td class="px-3 py-3 text-sm text-gray-500" style="word-wrap: break-word; overflow-wrap: break-word;">
-                            {{ $machine->plant->name ?? '-' }}
+                            {{ $machine->plant_name ?? '-' }}
                         </td>
                         <td class="px-3 py-3 text-sm text-gray-500" style="word-wrap: break-word; overflow-wrap: break-word;">
-                            {{ $machine->line->name ?? '-' }}
+                            {{ $machine->line_name ?? '-' }}
                         </td>
                         <td class="px-3 py-3 text-sm text-gray-500" style="word-wrap: break-word; overflow-wrap: break-word;">
                             {{ $data['pic_name'] ?? '-' }}
@@ -387,6 +387,30 @@
                 <p class="text-xs text-gray-600 mt-2">Semua maintenance point pada tanggal ini masih pending, Anda dapat memindahkan jadwal ke tanggal lain.</p>
             </div>
             
+            @if(auth()->user()->isAdmin())
+            <!-- Update PIC Section (Admin Only) -->
+            <div id="updatePicSection" class="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200 hidden">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <div class="flex items-center gap-2 flex-1">
+                        <label for="newPicSelect" class="text-sm font-medium text-gray-700">Ubah PIC:</label>
+                        <select id="newPicSelect" class="border rounded px-3 py-1 text-sm flex-1 max-w-xs">
+                            <option value="">Pilih PIC (Team Member)</option>
+                            @foreach(\App\Models\User::where('role', 'mekanik')->orderBy('name')->get() as $user)
+                                <option value="{{ $user->id }}">{{ $user->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <button type="button" onclick="updatePic()" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1 px-4 rounded text-sm transition flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Update PIC
+                    </button>
+                </div>
+                <p class="text-xs text-gray-600 mt-2">Hanya schedule yang belum completed yang akan diupdate.</p>
+            </div>
+            @endif
+            
             <!-- Batch Update Section -->
             <div class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <div class="flex items-center gap-3 flex-wrap">
@@ -531,6 +555,17 @@ function showSchedulePoints(machineId, dateKey) {
     } else {
         rescheduleSection.classList.add('hidden');
     }
+    
+    // Show/hide update PIC section for admin (only if there are non-completed schedules)
+    @if(auth()->user()->isAdmin())
+    const updatePicSection = document.getElementById('updatePicSection');
+    const hasNonCompleted = points.some(p => !p.is_completed);
+    if (hasNonCompleted && points.length > 0) {
+        updatePicSection.classList.remove('hidden');
+    } else {
+        updatePicSection.classList.add('hidden');
+    }
+    @endif
     
     // Show modal
     const modal = document.getElementById('schedulePointsModal');
@@ -689,6 +724,51 @@ function batchUpdateStatus() {
     .catch(error => {
         console.error('Error:', error);
         alert('Terjadi kesalahan saat mengupdate status');
+    });
+}
+
+// Update PIC function (Admin only)
+function updatePic() {
+    if (!currentMachineId || !currentDateKey) {
+        alert('Tidak ada data yang dipilih');
+        return;
+    }
+    
+    const newPicId = document.getElementById('newPicSelect').value;
+    if (!newPicId) {
+        alert('Pilih PIC terlebih dahulu');
+        return;
+    }
+    
+    if (!confirm('Apakah Anda yakin ingin mengubah PIC untuk semua schedule pada tanggal ini yang belum completed?')) {
+        return;
+    }
+    
+    fetch('{{ route("preventive-maintenance.scheduling.update-pic") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            machine_erp_id: currentMachineId,
+            scheduled_date: currentDateKey,
+            assigned_to: newPicId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            // Reload page to reflect changes
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.message || 'Gagal mengupdate PIC'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Terjadi kesalahan saat mengupdate PIC');
     });
 }
 

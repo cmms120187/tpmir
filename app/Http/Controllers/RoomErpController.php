@@ -4,6 +4,11 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\RoomErp;
+use App\Models\Line;
+use App\Models\DowntimeErp2;
+use App\Models\MachineErp;
+use App\Models\Activity;
+use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -15,7 +20,7 @@ class RoomErpController extends Controller
      */
     public function index()
     {
-        $roomErps = RoomErp::orderBy('name', 'asc')->paginate(10);
+        $roomErps = RoomErp::orderBy('name', 'asc')->paginate(15);
         return view('room_erp.index', compact('roomErps'));
     }
 
@@ -24,7 +29,8 @@ class RoomErpController extends Controller
      */
     public function create()
     {
-        return view('room_erp.create');
+        $lines = Line::with(['process', 'plant'])->orderBy('name')->get();
+        return view('room_erp.create', compact('lines'));
     }
 
     /**
@@ -60,7 +66,8 @@ class RoomErpController extends Controller
     public function edit(string $id)
     {
         $roomErp = RoomErp::findOrFail($id);
-        return view('room_erp.edit', compact('roomErp'));
+        $lines = Line::with(['process', 'plant'])->orderBy('name')->get();
+        return view('room_erp.edit', compact('roomErp', 'lines'));
     }
 
     /**
@@ -79,8 +86,225 @@ class RoomErpController extends Controller
         ]);
 
         $roomErp = RoomErp::findOrFail($id);
-        $roomErp->update($validated);
-        return redirect()->route('room-erp.index')->with('success', 'Room ERP updated successfully.');
+        $oldKodeRoom = $roomErp->kode_room;
+        $newKodeRoom = $validated['kode_room'] ?? null;
+        
+        DB::beginTransaction();
+        try {
+            // Update RoomERP
+            $roomErp->update($validated);
+            
+            $downtimeUpdated = 0;
+            $machineUpdated = 0;
+            $activityUpdated = 0;
+            
+            // Update based on kode_room (if exists)
+            $kodeRoomToMatch = $oldKodeRoom ?: $newKodeRoom;
+            if ($kodeRoomToMatch) {
+                // Build update data for downtime_erp2
+                $downtimeUpdateData = [];
+                if ($oldKodeRoom !== $newKodeRoom && $newKodeRoom) {
+                    $downtimeUpdateData['kode_room'] = $newKodeRoom;
+                }
+                if (isset($validated['plant_name'])) {
+                    $downtimeUpdateData['plant'] = $validated['plant_name'];
+                }
+                if (isset($validated['process_name'])) {
+                    $downtimeUpdateData['process'] = $validated['process_name'];
+                }
+                if (isset($validated['line_name'])) {
+                    $downtimeUpdateData['line'] = $validated['line_name'];
+                }
+                if (isset($validated['name'])) {
+                    $downtimeUpdateData['roomName'] = $validated['name'];
+                }
+                
+                if (!empty($downtimeUpdateData)) {
+                    $downtimeUpdated += DowntimeErp2::where('kode_room', $kodeRoomToMatch)
+                        ->update($downtimeUpdateData);
+                }
+                
+                // Build update data for machine_erp
+                $machineUpdateData = [];
+                if ($oldKodeRoom !== $newKodeRoom && $newKodeRoom) {
+                    $machineUpdateData['kode_room'] = $newKodeRoom;
+                }
+                if (isset($validated['plant_name'])) {
+                    $machineUpdateData['plant_name'] = $validated['plant_name'];
+                }
+                if (isset($validated['process_name'])) {
+                    $machineUpdateData['process_name'] = $validated['process_name'];
+                }
+                if (isset($validated['line_name'])) {
+                    $machineUpdateData['line_name'] = $validated['line_name'];
+                }
+                if (isset($validated['name'])) {
+                    $machineUpdateData['room_name'] = $validated['name'];
+                }
+                
+                if (!empty($machineUpdateData)) {
+                    $machineUpdated += MachineErp::where('kode_room', $kodeRoomToMatch)
+                        ->update($machineUpdateData);
+                }
+                
+                // Build update data for activities
+                $activityUpdateData = [];
+                if ($oldKodeRoom !== $newKodeRoom && $newKodeRoom) {
+                    $activityUpdateData['kode_room'] = $newKodeRoom;
+                }
+                
+                if (!empty($activityUpdateData)) {
+                    $activityUpdated += Activity::where('kode_room', $kodeRoomToMatch)
+                        ->update($activityUpdateData);
+                }
+            }
+            
+            // Also update by matching room_name, plant_name, process_name, line_name
+            // This handles cases where kode_room is not set yet or needs to be synced
+            // Always run this to ensure data consistency
+            if (isset($validated['name']) && isset($validated['plant_name']) && 
+                isset($validated['process_name']) && isset($validated['line_name'])) {
+                
+                // Build query conditions for matching
+                $matchConditions = [
+                    ['roomName', $validated['name']],
+                    ['plant', $validated['plant_name']],
+                    ['process', $validated['process_name']],
+                    ['line', $validated['line_name']],
+                ];
+                
+                // Update downtime_erp2 by matching room name and other fields
+                $downtimeUpdateDataByMatch = [];
+                if ($newKodeRoom) {
+                    $downtimeUpdateDataByMatch['kode_room'] = $newKodeRoom;
+                }
+                if (isset($validated['plant_name'])) {
+                    $downtimeUpdateDataByMatch['plant'] = $validated['plant_name'];
+                }
+                if (isset($validated['process_name'])) {
+                    $downtimeUpdateDataByMatch['process'] = $validated['process_name'];
+                }
+                if (isset($validated['line_name'])) {
+                    $downtimeUpdateDataByMatch['line'] = $validated['line_name'];
+                }
+                if (isset($validated['name'])) {
+                    $downtimeUpdateDataByMatch['roomName'] = $validated['name'];
+                }
+                
+                if (!empty($downtimeUpdateDataByMatch)) {
+                    $downtimeQuery = DowntimeErp2::where('roomName', $validated['name'])
+                        ->where('plant', $validated['plant_name'])
+                        ->where('process', $validated['process_name'])
+                        ->where('line', $validated['line_name']);
+                    
+                    // If adding new kode_room (not updating existing), only update records without kode_room
+                    // If updating existing kode_room or other fields, update all matching records
+                    if ($newKodeRoom && !$oldKodeRoom) {
+                        $downtimeQuery->where(function($q) {
+                            $q->whereNull('kode_room')->orWhere('kode_room', '');
+                        });
+                    } elseif ($oldKodeRoom && $oldKodeRoom !== $newKodeRoom) {
+                        // If kode_room changed, also update records that match by room name
+                        // but don't have the old kode_room (they might have different or no kode_room)
+                        $downtimeQuery->where(function($q) use ($oldKodeRoom) {
+                            $q->where('kode_room', $oldKodeRoom)
+                              ->orWhere(function($q2) {
+                                  $q2->whereNull('kode_room')->orWhere('kode_room', '');
+                              });
+                        });
+                    }
+                    
+                    $downtimeMatched = $downtimeQuery->update($downtimeUpdateDataByMatch);
+                    $downtimeUpdated += $downtimeMatched;
+                }
+                
+                // Update machine_erp by matching room name and other fields
+                $machineUpdateDataByMatch = [];
+                if ($newKodeRoom) {
+                    $machineUpdateDataByMatch['kode_room'] = $newKodeRoom;
+                }
+                if (isset($validated['plant_name'])) {
+                    $machineUpdateDataByMatch['plant_name'] = $validated['plant_name'];
+                }
+                if (isset($validated['process_name'])) {
+                    $machineUpdateDataByMatch['process_name'] = $validated['process_name'];
+                }
+                if (isset($validated['line_name'])) {
+                    $machineUpdateDataByMatch['line_name'] = $validated['line_name'];
+                }
+                if (isset($validated['name'])) {
+                    $machineUpdateDataByMatch['room_name'] = $validated['name'];
+                }
+                
+                if (!empty($machineUpdateDataByMatch)) {
+                    $machineQuery = MachineErp::where('room_name', $validated['name'])
+                        ->where('plant_name', $validated['plant_name'])
+                        ->where('process_name', $validated['process_name'])
+                        ->where('line_name', $validated['line_name']);
+                    
+                    // If adding new kode_room (not updating existing), only update records without kode_room
+                    // Otherwise, update all matching records (for syncing other fields or updating kode_room)
+                    if ($newKodeRoom && !$oldKodeRoom) {
+                        // Only update records without kode_room when adding new kode_room
+                        $machineQuery->where(function($q) {
+                            $q->whereNull('kode_room')->orWhere('kode_room', '');
+                        });
+                    }
+                    // If updating existing kode_room or other fields, update all matching records
+                    // (no additional where clause needed)
+                    
+                    $machineMatched = $machineQuery->update($machineUpdateDataByMatch);
+                    $machineUpdated += $machineMatched;
+                }
+                
+                // Update activities by matching room name and other fields
+                $activityUpdateDataByMatch = [];
+                if ($newKodeRoom) {
+                    $activityUpdateDataByMatch['kode_room'] = $newKodeRoom;
+                }
+                
+                if (!empty($activityUpdateDataByMatch)) {
+                    $activityQuery = Activity::where('room_name', $validated['name'])
+                        ->where('plant', $validated['plant_name'])
+                        ->where('process', $validated['process_name'])
+                        ->where('line', $validated['line_name']);
+                    
+                    // If adding new kode_room (not updating existing), only update records without kode_room
+                    // Otherwise, update all matching records (for syncing other fields or updating kode_room)
+                    if ($newKodeRoom && !$oldKodeRoom) {
+                        // Only update records without kode_room when adding new kode_room
+                        $activityQuery->where(function($q) {
+                            $q->whereNull('kode_room')->orWhere('kode_room', '');
+                        });
+                    }
+                    // If updating existing kode_room or other fields, update all matching records
+                    // (no additional where clause needed)
+                    
+                    $activityMatched = $activityQuery->update($activityUpdateDataByMatch);
+                    $activityUpdated += $activityMatched;
+                }
+            }
+            
+            DB::commit();
+            
+            $message = 'Room ERP updated successfully.';
+            $updates = [];
+            if ($downtimeUpdated > 0) $updates[] = "{$downtimeUpdated} downtime record(s)";
+            if ($machineUpdated > 0) $updates[] = "{$machineUpdated} machine record(s)";
+            if ($activityUpdated > 0) $updates[] = "{$activityUpdated} activity record(s)";
+            
+            if (!empty($updates)) {
+                $message .= ' Related data updated: ' . implode(', ', $updates) . '.';
+            }
+            
+            return redirect()->route('room-erp.index')->with('success', $message);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Error updating RoomERP and related data: ' . $e->getMessage());
+            return redirect()->route('room-erp.index')
+                ->withErrors(['error' => 'Error updating Room ERP: ' . $e->getMessage()]);
+        }
     }
 
     /**
