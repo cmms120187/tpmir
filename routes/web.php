@@ -205,8 +205,10 @@ Route::middleware('auth')->group(function () {
         
         // Updating - Custom routes must be defined BEFORE resource routes
         Route::get('updating/get-maintenance-points-by-machine-and-date', [PredictiveUpdatingController::class, 'getMaintenancePointsByMachineAndDate'])->name('updating.get-maintenance-points-by-machine-and-date');
+        Route::get('updating/create-from-schedule', [PredictiveUpdatingController::class, 'createFromSchedule'])->name('updating.create-from-schedule');
         Route::get('updating', [PredictiveUpdatingController::class, 'index'])->name('updating.index');
         Route::get('updating/{id}/edit', [PredictiveUpdatingController::class, 'edit'])->name('updating.edit');
+        Route::put('updating/batch-update', [PredictiveUpdatingController::class, 'batchUpdate'])->name('updating.batch-update');
         Route::put('updating/{id}', [PredictiveUpdatingController::class, 'update'])->name('updating.update');
         
         // Reporting

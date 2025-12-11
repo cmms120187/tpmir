@@ -168,42 +168,87 @@ class UserController extends Controller
      */
     public function update(Request $request, string $id)
     {
+        $user = \App\Models\User::findOrFail($id);
+        $currentUser = auth()->user();
+        
+        // Validasi dasar (tanpa validasi atasan_id yang ketat di Laravel validation)
         $validated = $request->validate([
             'nik' => 'required|string|size:5|unique:users,nik,' . $id . '|regex:/^[0-9]{5}$/',
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $id,
             'role' => 'required|string|in:mekanik,team_leader,group_leader,coordinator,ast_manager,manager,general_manager,admin',
-            'atasan_id' => 'nullable|exists:users,id',
+            'atasan_id' => 'nullable',
             'password' => 'nullable|string|min:6',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
         
-        // Admin tidak perlu atasan
-        if ($validated['role'] === 'admin') {
-            $validated['atasan_id'] = null;
-        }
-        
-        // Validasi atasan sesuai hierarki (skip untuk admin)
-        if ($validated['role'] !== 'admin' && $request->filled('atasan_id')) {
-            $atasan = \App\Models\User::findOrFail($request->atasan_id);
-            $roleHierarchy = [
-                'mekanik' => 'team_leader',
-                'team_leader' => 'group_leader',
-                'group_leader' => 'coordinator',
-                'coordinator' => 'ast_manager',
-                'ast_manager' => 'manager',
-                'manager' => 'general_manager',
-            ];
-            
-            if (isset($roleHierarchy[$validated['role']])) {
-                $expectedAtasanRole = $roleHierarchy[$validated['role']];
-                if ($atasan->role !== $expectedAtasanRole) {
-                    return back()->withErrors(['atasan_id' => 'Atasan harus memiliki role ' . $expectedAtasanRole])->withInput();
+        // Jika user yang login adalah admin, skip semua validasi atasan
+        // Admin boleh mengubah role apapun tanpa validasi atasan yang ketat
+        if ($currentUser && $currentUser->role === 'admin') {
+            // Untuk role admin dan general_manager, selalu set atasan_id = null
+            if ($validated['role'] === 'admin' || $validated['role'] === 'general_manager') {
+                $validated['atasan_id'] = null;
+            } else {
+                // Untuk role lain, cek apakah atasan_id diisi dan valid
+                // Jika tidak sesuai, clear saja (bukan error)
+                if ($request->filled('atasan_id') && $request->atasan_id !== '' && $request->atasan_id !== null) {
+                    $atasan = \App\Models\User::find($request->atasan_id);
+                    if ($atasan) {
+                        $roleHierarchy = [
+                            'mekanik' => 'team_leader',
+                            'team_leader' => 'group_leader',
+                            'group_leader' => 'coordinator',
+                            'coordinator' => 'ast_manager',
+                            'ast_manager' => 'manager',
+                            'manager' => 'general_manager',
+                        ];
+                        
+                        if (isset($roleHierarchy[$validated['role']])) {
+                            $expectedAtasanRole = $roleHierarchy[$validated['role']];
+                            // Jika atasan tidak sesuai, clear atasan_id (bukan error untuk admin)
+                            if ($atasan->role !== $expectedAtasanRole) {
+                                $validated['atasan_id'] = null;
+                            }
+                        }
+                    } else {
+                        $validated['atasan_id'] = null;
+                    }
+                } else {
+                    // Jika atasan_id tidak diisi atau kosong, set null
+                    $validated['atasan_id'] = null;
+                }
+            }
+        } else {
+            // Untuk non-admin, tetap validasi seperti biasa
+            if ($validated['role'] === 'admin' || $validated['role'] === 'general_manager') {
+                $validated['atasan_id'] = null;
+            } else {
+                if ($request->filled('atasan_id') && $request->atasan_id !== '' && $request->atasan_id !== null) {
+                    $atasan = \App\Models\User::find($request->atasan_id);
+                    if ($atasan) {
+                        $roleHierarchy = [
+                            'mekanik' => 'team_leader',
+                            'team_leader' => 'group_leader',
+                            'group_leader' => 'coordinator',
+                            'coordinator' => 'ast_manager',
+                            'ast_manager' => 'manager',
+                            'manager' => 'general_manager',
+                        ];
+                        
+                        if (isset($roleHierarchy[$validated['role']])) {
+                            $expectedAtasanRole = $roleHierarchy[$validated['role']];
+                            if ($atasan->role !== $expectedAtasanRole) {
+                                $validated['atasan_id'] = null;
+                            }
+                        }
+                    } else {
+                        $validated['atasan_id'] = null;
+                    }
+                } else {
+                    $validated['atasan_id'] = null;
                 }
             }
         }
-        
-        $user = \App\Models\User::findOrFail($id);
         
         // Handle photo upload
         if ($request->hasFile('photo')) {

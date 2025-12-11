@@ -52,11 +52,15 @@ class PermissionHelper
         
         // Downtime menus
         'downtime' => ['allowed_roles' => ['team_leader', 'group_leader', 'coordinator', 'ast_manager', 'manager', 'general_manager']],
-        'problems' => ['allowed_roles' => ['team_leader', 'group_leader', 'coordinator', 'ast_manager', 'manager', 'general_manager']],
-        'reasons' => ['allowed_roles' => ['team_leader', 'group_leader', 'coordinator', 'ast_manager', 'manager', 'general_manager']],
-        'actions' => ['allowed_roles' => ['team_leader', 'group_leader', 'coordinator', 'ast_manager', 'manager', 'general_manager']],
+        'problems' => ['allowed_roles' => ['group_leader', 'coordinator', 'ast_manager', 'manager', 'general_manager']],
+        'reasons' => ['allowed_roles' => ['group_leader', 'coordinator', 'ast_manager', 'manager', 'general_manager']],
+        'actions' => ['allowed_roles' => ['group_leader', 'coordinator', 'ast_manager', 'manager', 'general_manager']],
         'downtime-erp2' => ['allowed_roles' => ['team_leader', 'group_leader', 'coordinator', 'ast_manager', 'manager', 'general_manager']],
         'work-orders' => ['allowed_roles' => ['team_leader', 'group_leader', 'coordinator', 'ast_manager', 'manager', 'general_manager']],
+        
+        // Production menus
+        'production' => ['allowed_roles' => ['team_leader', 'group_leader', 'coordinator', 'ast_manager', 'manager', 'general_manager']],
+        'production-hourly' => ['allowed_roles' => ['team_leader', 'group_leader', 'coordinator', 'ast_manager', 'manager', 'general_manager']],
         
         // Users menus
         'users' => ['allowed_roles' => ['coordinator', 'ast_manager', 'manager', 'general_manager']],

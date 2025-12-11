@@ -5,7 +5,10 @@
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-2xl font-bold text-gray-800">Predictive Maintenance - Updating</h1>
-                <p class="text-sm text-gray-500 mt-1">Tanggal Hari Ini: {{ \Carbon\Carbon::now()->locale('id')->translatedFormat('l, d F Y') }}</p>
+                <p class="text-sm text-gray-500 mt-1">
+                    Tanggal Hari Ini: {{ \Carbon\Carbon::now()->locale('id')->translatedFormat('l, d F Y') }} | 
+                    <span class="text-blue-600 font-medium">Menampilkan jadwal tahun {{ \Carbon\Carbon::now()->year }}</span>
+                </p>
             </div>
         </div>
 
@@ -96,10 +99,7 @@
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-sm">
-                                    <button onclick="showMaintenancePoints({{ $jadwal['machine_id'] }}, '{{ $jadwal['scheduled_date'] }}')"
-                                            class="text-blue-600 hover:text-blue-800 hover:underline font-medium">
                                         {{ \Carbon\Carbon::parse($jadwal['scheduled_date'])->format('d/m/Y') }}
-                                    </button>
                                 </td>
                                 <td class="px-4 py-3 text-sm">
                                     @if($jadwal['status'] == 'pending')
@@ -113,15 +113,29 @@
                                 <td class="px-4 py-3 text-center">
                                     @php
                                         $firstExecution = $jadwal['executions'][0] ?? null;
+                                        $firstSchedule = $jadwal['first_schedule'] ?? null;
                                     @endphp
+                                    <div class="flex items-center justify-center gap-2">
                                     @if($firstExecution)
                                         <a href="{{ route('predictive-maintenance.updating.edit', $firstExecution->id) }}"
-                                           class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white p-2 rounded shadow transition">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                               class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow transition text-sm"
+                                               title="Update Jadwal">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                </svg>
+                                                Update
+                                            </a>
+                                        @elseif($firstSchedule)
+                                            <a href="{{ route('predictive-maintenance.updating.create-from-schedule', ['schedule_id' => $firstSchedule->id, 'scheduled_date' => $jadwal['scheduled_date']]) }}"
+                                               class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow transition text-sm"
+                                               title="Buat dan Update Jadwal">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
+                                                Update
                                         </a>
                                     @endif
+                                    </div>
                                 </td>
                             </tr>
                             @endforeach
@@ -134,7 +148,26 @@
                     {{ $jadwalPaginator->links() }}
                 </div>
             @else
+                @php
+                    $user = auth()->user();
+                    $userRole = $user->role ?? 'mekanik';
+                @endphp
+                @if($userRole === 'team_leader')
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-yellow-600 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <p class="text-gray-700 font-medium mb-2">Tidak ada jadwal yang di-assign ke Anda</p>
+                        <p class="text-sm text-gray-600 mb-4">
+                            Saat ini tidak ada jadwal Predictive Maintenance yang di-assign ke akun Anda ({{ $user->name }} - NIK: {{ $user->nik ?? '-' }}).
+                        </p>
+                        <p class="text-sm text-gray-600">
+                            Silakan hubungi administrator untuk mengassign jadwal di menu <strong>Predictive Maintenance > Scheduling</strong> dengan memilih Anda sebagai PIC (Person In Charge).
+                        </p>
+                </div>
+            @else
                 <p class="text-gray-500 text-center py-8">No jadwal to update.</p>
+                @endif
             @endif
         </div>
 
@@ -149,6 +182,8 @@
                                 <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Machine</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Schedule Date</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">End Time</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase">Status</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -159,13 +194,38 @@
                                     <div class="text-gray-500">{{ $jadwal['machine']->machineType->name ?? '-' }}</div>
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-500">
-                                    <button onclick="showMaintenancePoints({{ $jadwal['machine_id'] }}, '{{ $jadwal['scheduled_date'] }}')"
-                                            class="text-green-600 hover:text-green-800 hover:underline">
                                         {{ \Carbon\Carbon::parse($jadwal['scheduled_date'])->format('d/m/Y') }}
-                                    </button>
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-500">
                                     {{ $jadwal['latest_end_time'] ? \Carbon\Carbon::parse($jadwal['latest_end_time'])->format('d/m/Y H:i') : '-' }}
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    @php
+                                        $status = $jadwal['status'] ?? ($jadwal['executions'][0]->status ?? 'completed');
+                                    @endphp
+                                    @if($status == 'completed')
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Completed</span>
+                                    @elseif($status == 'in_progress')
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">In Progress</span>
+                                    @else
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Pending</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    @php
+                                        $firstExecution = $jadwal['executions'][0] ?? null;
+                                    @endphp
+                                    <div class="flex items-center justify-center gap-2">
+                                        <button onclick="showMaintenancePoints({{ $jadwal['machine_id'] }}, '{{ $jadwal['scheduled_date'] }}')"
+                                                class="inline-flex items-center justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded shadow transition text-sm"
+                                                title="Lihat dan Edit Maintenance Points">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            Points
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             @endforeach
@@ -186,8 +246,8 @@
 </div>
 
 <!-- Modal for Maintenance Points -->
-<div id="maintenancePointsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50 flex items-center justify-center">
-    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+<div id="maintenancePointsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50 flex items-center justify-center" onclick="if(event.target === this) closeMaintenancePointsModal();">
+    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto" onclick="if(event.target === this) event.stopPropagation();">
         <div class="p-6">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold text-gray-800">Maintenance Points</h3>
@@ -208,6 +268,10 @@
 function showMaintenancePoints(machineId, scheduledDate) {
     const modal = document.getElementById('maintenancePointsModal');
     const content = document.getElementById('maintenancePointsContent');
+    
+    // Store machineId and scheduledDate in modal dataset for later use
+    modal.dataset.machineId = machineId;
+    modal.dataset.scheduledDate = scheduledDate;
 
     content.innerHTML = '<p class="text-center py-4">Loading...</p>';
     modal.classList.remove('hidden');
@@ -278,34 +342,34 @@ function showMaintenancePoints(machineId, scheduledDate) {
                                     <div><strong>Start Time:</strong> ${point.actual_start_time || '-'}</div>
                                     <div><strong>End Time:</strong> ${point.actual_end_time || '-'}</div>
                                 </div>
-                                ${point.execution_id ? `
-                                    <div class="mt-3">
-                                        <a href="{{ url('predictive-maintenance/updating') }}/${point.execution_id}/edit"
-                                           class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                            </svg>
-                                            Edit
-                                        </a>
-                                    </div>
-                                ` : ''}
                             </div>
                         </div>
                     </div>
                 `;
-                                <a href="{{ url('predictive-maintenance/updating') }}/${point.execution_id}/edit"
-                                   class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                    Edit
-                                </a>
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
             });
             content.innerHTML = html;
+            
+            // Re-initialize input fields after innerHTML to ensure they're interactive
+            setTimeout(() => {
+                data.maintenance_points.forEach((point) => {
+                    if (point.execution_id) {
+                        const inputField = document.getElementById(`measured_value-${point.execution_id}`);
+                        if (inputField) {
+                            // Ensure it's interactive
+                            inputField.disabled = false;
+                            inputField.readOnly = false;
+                            inputField.removeAttribute('readonly');
+                            inputField.removeAttribute('disabled');
+                            inputField.style.pointerEvents = 'auto';
+                            inputField.style.cursor = 'text';
+                            inputField.style.zIndex = '1000';
+                            inputField.style.position = 'relative';
+                            
+                            console.log('Input field re-initialized:', inputField.id, 'disabled:', inputField.disabled, 'readonly:', inputField.readOnly);
+                        }
+                    }
+                });
+            }, 100);
         } else {
             content.innerHTML = '<p class="text-center py-4 text-gray-500">No maintenance points found for this date.</p>';
         }
@@ -318,6 +382,10 @@ function showMaintenancePoints(machineId, scheduledDate) {
 
 function closeMaintenancePointsModal() {
     document.getElementById('maintenancePointsModal').classList.add('hidden');
+    // Close all edit forms when closing modal
+    document.querySelectorAll('[id^="editForm-"]').forEach(form => {
+        form.classList.add('hidden');
+    });
 }
 
 document.getElementById('maintenancePointsModal').addEventListener('click', function(e) {
@@ -325,5 +393,198 @@ document.getElementById('maintenancePointsModal').addEventListener('click', func
         closeMaintenancePointsModal();
     }
 });
+
+// Show edit form inline
+function showEditForm(executionId) {
+    console.log('showEditForm called with executionId:', executionId);
+    
+    // Hide all other edit forms first
+    document.querySelectorAll('[id^="editForm-"]').forEach(form => {
+        if (form.id !== `editForm-${executionId}`) {
+            form.classList.add('hidden');
+        }
+    });
+    
+    const editForm = document.getElementById(`editForm-${executionId}`);
+    console.log('editForm element:', editForm);
+    
+    if (editForm) {
+        // Remove hidden class to show the form
+        editForm.classList.remove('hidden');
+        // Force display style to ensure form is visible
+        editForm.style.display = 'block';
+        editForm.style.visibility = 'visible';
+        editForm.style.opacity = '1';
+        
+        // Ensure form and all inputs are interactive
+        const allInputs = editForm.querySelectorAll('input, select, textarea, button');
+        allInputs.forEach(input => {
+            input.disabled = false;
+            input.readOnly = false;
+            input.style.pointerEvents = 'auto';
+            input.style.cursor = 'text';
+        });
+        
+        // Scroll to form
+        setTimeout(() => {
+            editForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            // Get input field
+            const inputField = document.getElementById(`measured_value-${executionId}`);
+            console.log('Input field:', inputField);
+            
+            if (inputField) {
+                // Ensure input is not disabled or readonly
+                inputField.disabled = false;
+                inputField.readOnly = false;
+                inputField.removeAttribute('readonly');
+                inputField.removeAttribute('disabled');
+                inputField.style.pointerEvents = 'auto';
+                inputField.style.cursor = 'text';
+                inputField.style.userSelect = 'text';
+                inputField.style.webkitUserSelect = 'text';
+                
+                // Clone input to remove any interfering event listeners
+                const newInput = inputField.cloneNode(true);
+                inputField.parentNode.replaceChild(newInput, inputField);
+                
+                // Get the clean input
+                const cleanInput = document.getElementById(`measured_value-${executionId}`);
+                
+                // Ensure it's fully interactive - no blocking
+                cleanInput.disabled = false;
+                cleanInput.readOnly = false;
+                cleanInput.removeAttribute('readonly');
+                cleanInput.removeAttribute('disabled');
+                cleanInput.style.pointerEvents = 'auto';
+                cleanInput.style.cursor = 'text';
+                cleanInput.style.userSelect = 'text';
+                cleanInput.style.webkitUserSelect = 'text';
+                cleanInput.style.zIndex = '1000';
+                cleanInput.style.position = 'relative';
+                
+                // Only add passive listeners for debugging
+                cleanInput.addEventListener('input', function(e) {
+                    console.log('✅ Input field value changed to:', this.value);
+                }, { passive: true });
+                
+                cleanInput.addEventListener('keydown', function(e) {
+                    console.log('✅ Key pressed:', e.key);
+                }, { passive: true });
+                
+                console.log('✅ Input field cleaned and ready:', cleanInput.id);
+                
+                // Don't auto-focus, let user click manually
+                // Just ensure the field is ready for input
+                console.log('Input field is ready for input');
+                console.log('Input field value:', inputField.value);
+                console.log('Input field disabled:', inputField.disabled);
+                console.log('Input field readonly:', inputField.readOnly);
+            } else {
+                console.error('Input field not found for executionId:', executionId);
+            }
+        }, 100);
+    } else {
+        console.error('Edit form not found for executionId:', executionId);
+        alert('Form edit tidak ditemukan. Silakan refresh halaman dan coba lagi.');
+    }
+}
+
+// Hide edit form inline
+function hideEditForm(executionId) {
+    const editForm = document.getElementById(`editForm-${executionId}`);
+    if (editForm) {
+        editForm.classList.add('hidden');
+    }
+}
+
+// Update execution via AJAX
+function updateExecution(event, executionId) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    let measuredValue = formData.get('measured_value');
+    
+    // Convert to number if it's a valid number
+    if (measuredValue) {
+        measuredValue = measuredValue.toString().trim();
+        const numValue = parseFloat(measuredValue);
+        if (isNaN(numValue)) {
+            alert('Nilai harus berupa angka yang valid.');
+            return false;
+        }
+        // Update formData with the numeric value
+        formData.set('measured_value', numValue);
+    }
+    
+    const status = formData.get('status');
+    
+    // Validation: If status is completed, measured_value must be filled
+    if (status === 'completed' && (!measuredValue || measuredValue.toString().trim() === '')) {
+        alert('Measured value harus diisi jika status adalah Completed.');
+        return false;
+    }
+    
+    // Show loading state
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalText = submitButton.textContent;
+    submitButton.disabled = true;
+    submitButton.textContent = 'Updating...';
+    
+    const url = `{{ url('predictive-maintenance/updating') }}/${executionId}`;
+    const csrfToken = form.querySelector('input[name="_token"]').value;
+    
+    // Ensure _method is set to PUT for method spoofing
+    formData.append('_method', 'PUT');
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.message || 'Terjadi kesalahan saat mengupdate data.');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success || data.message) {
+            // Close edit form
+            hideEditForm(executionId);
+            
+            // Reload maintenance points to show updated data
+            const modal = document.getElementById('maintenancePointsModal');
+            const machineId = modal.dataset.machineId;
+            const scheduledDate = modal.dataset.scheduledDate;
+            
+            if (machineId && scheduledDate) {
+                showMaintenancePoints(machineId, scheduledDate);
+            }
+            
+            // Show success message
+            alert('Data berhasil diupdate!');
+        } else {
+            alert('Terjadi kesalahan saat mengupdate data.');
+            submitButton.disabled = false;
+            submitButton.textContent = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert(error.message || 'Terjadi kesalahan saat mengupdate data.');
+        submitButton.disabled = false;
+        submitButton.textContent = originalText;
+    });
+    
+    return false;
+}
 </script>
 @endsection

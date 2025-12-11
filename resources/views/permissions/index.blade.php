@@ -1,5 +1,31 @@
 @extends('layouts.app')
 @section('content')
+<style>
+    /* Ensure checkboxes are always clickable */
+    .permission-checkbox {
+        pointer-events: auto !important;
+        cursor: pointer !important;
+        position: relative !important;
+        z-index: 10 !important;
+    }
+    
+    .permission-checkbox:disabled {
+        pointer-events: none !important;
+    }
+    
+    /* Ensure table cells don't block clicks */
+    td.permission-cell {
+        position: relative;
+        z-index: 1;
+        pointer-events: none;
+    }
+    
+    td.permission-cell label,
+    td.permission-cell input[type="checkbox"] {
+        pointer-events: auto;
+        cursor: pointer;
+    }
+</style>
 <div class="w-full p-4 sm:p-6 lg:p-8">
     <div class="w-full mx-auto">
         <div class="flex items-center justify-between mb-6">
@@ -61,27 +87,23 @@
                                                             @php
                                                                 $permissionKey = $role . '_' . $menuKey;
                                                                 $isChecked = false;
+                                                                // Only check database, don't fallback to default permissions
+                                                                // The management interface should only reflect what's in the database
                                                                 if (isset($permissions[$permissionKey]) && $permissions[$permissionKey]->allowed) {
                                                                     $isChecked = true;
-                                                                } else {
-                                                                    // Check default permission from PermissionHelper
-                                                                    try {
-                                                                        $defaultPermission = \App\Helpers\PermissionHelper::getMenuPermissions()[$menuKey] ?? null;
-                                                                        if ($defaultPermission) {
-                                                                            $isChecked = in_array('all', $defaultPermission['allowed_roles']) || 
-                                                                                         in_array($role, $defaultPermission['allowed_roles']);
-                                                                        }
-                                                                    } catch (\Exception $e) {
-                                                                        // Fallback if PermissionHelper fails
-                                                                    }
                                                                 }
                                                             @endphp
-                                                            <td class="border border-gray-300 px-3 py-3 text-center">
-                                                                <input type="checkbox" 
-                                                                       name="permissions[{{ $menuKey }}][{{ $role }}][allowed]"
-                                                                       value="1"
-                                                                       {{ $isChecked ? 'checked' : '' }}
-                                                                       class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                                                            <td class="border border-gray-300 px-3 py-3 text-center permission-cell">
+                                                                <label class="inline-flex items-center cursor-pointer">
+                                                                    <input type="checkbox" 
+                                                                           name="permissions[{{ $menuKey }}][{{ $role }}][allowed]"
+                                                                           value="1"
+                                                                           {{ $isChecked ? 'checked' : '' }}
+                                                                           class="permission-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                                                                           style="width: 1.25rem; height: 1.25rem; cursor: pointer;"
+                                                                           data-role="{{ $role }}"
+                                                                           data-menu-key="{{ $menuKey }}">
+                                                                </label>
                                                                 <input type="hidden" 
                                                                        name="permissions[{{ $menuKey }}][{{ $role }}][role]" 
                                                                        value="{{ $role }}">
@@ -128,6 +150,86 @@
             location.reload();
         }
     }
+
+    // Ensure form can be submitted properly and checkboxes are clickable
+    (function() {
+        'use strict';
+        
+        function initPermissionsForm() {
+            const form = document.getElementById('permissions-form');
+            if (!form) {
+                console.warn('Permissions form not found');
+                return;
+            }
+            
+            // Make sure all checkboxes are enabled and clickable
+            const checkboxes = form.querySelectorAll('input[type="checkbox"].permission-checkbox');
+            console.log('Found', checkboxes.length, 'checkboxes');
+            
+            checkboxes.forEach(function(checkbox, index) {
+                // Remove any disabled or readonly attributes
+                checkbox.removeAttribute('disabled');
+                checkbox.removeAttribute('readonly');
+                
+                // Ensure checkbox is interactive
+                checkbox.style.pointerEvents = 'auto';
+                checkbox.style.cursor = 'pointer';
+                
+                // Test click event
+                checkbox.addEventListener('change', function(e) {
+                    console.log('Checkbox changed:', this.name, this.checked);
+                }, false);
+            });
+            
+            // Form submission handler - ensure it works
+            form.addEventListener('submit', function(e) {
+                // Count checked checkboxes
+                const checkedCount = form.querySelectorAll('input[type="checkbox"].permission-checkbox:checked').length;
+                const totalCount = form.querySelectorAll('input[type="checkbox"].permission-checkbox').length;
+                console.log('Submitting form with', checkedCount, 'checked permissions out of', totalCount, 'total');
+                
+                // Debug: Log form data structure
+                const formData = new FormData(form);
+                const permissionsData = {};
+                for (let [key, value] of formData.entries()) {
+                    if (key.startsWith('permissions[')) {
+                        permissionsData[key] = value;
+                    }
+                }
+                console.log('Form data structure:', permissionsData);
+                
+                // Show loading state
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    const originalText = submitBtn.textContent;
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Saving...';
+                    
+                    // Re-enable after 5 seconds if form doesn't redirect (error case)
+                    setTimeout(function() {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = originalText;
+                    }, 5000);
+                }
+                
+                // Allow form to submit normally
+                // Unchecked checkboxes won't be sent, which is correct behavior
+                // The backend will handle this by deleting all permissions and only inserting checked ones
+                return true;
+            }, false);
+        }
+        
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPermissionsForm);
+        } else {
+            // DOM already loaded
+            initPermissionsForm();
+        }
+        
+        // Also try after a short delay in case of race conditions
+        setTimeout(initPermissionsForm, 100);
+    })();
 </script>
 @endsection
 

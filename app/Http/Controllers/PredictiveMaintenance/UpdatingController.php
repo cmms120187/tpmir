@@ -17,23 +17,82 @@ class UpdatingController extends Controller
      */
     public function index()
     {
-        // Get all executions (not just pending/in_progress) to check if jadwal is fully completed
-        // IMPORTANT: 1 jadwal (schedule_id + scheduled_date) = 1 execution (latest status)
-        $query = PredictiveMaintenanceExecution::with(['schedule.machineErp.machineType', 'schedule.machineErp.roomErp', 'schedule.standard', 'performedBy', 'schedule']);
+        // Filter by current year only - hanya menampilkan jadwal tahun berjalan
+        $currentYear = now()->year;
         
-        // Filter by user role (mekanik only sees their own assigned executions)
+        $user = auth()->user();
+        $userRole = $user->role ?? 'mekanik';
+        $userId = $user->id ?? null;
+        
+        // Get all active schedules for current year - untuk menampilkan jadwal yang belum ada execution-nya
+        $scheduleQuery = PredictiveMaintenanceSchedule::where('status', 'active')
+            ->whereYear('start_date', $currentYear);
+        
+        // Filter schedules by user role
+        // Admin: no filter (akses semua)
+        // Team Leader: hanya jadwal yang assigned_to = user_id mereka
+        // Mekanik: filter akan dilakukan di execution query
+        if ($userRole === 'team_leader' && $userId) {
+            $scheduleQuery->where('assigned_to', $userId);
+        }
+        // Admin dan role lain tidak perlu filter schedule
+        
+        $schedules = $scheduleQuery->with(['machineErp.machineType', 'machineErp.roomErp', 'standard', 'assignedUser', 'executions'])
+            ->orderBy('start_date', 'asc')
+            ->get();
+        
+        // Get all executions for current year
+        $executionQuery = PredictiveMaintenanceExecution::with(['schedule.machineErp.machineType', 'schedule.machineErp.roomErp', 'schedule.standard', 'performedBy', 'schedule']);
+        $executionQuery->whereYear('scheduled_date', $currentYear);
+        
+        // Filter by user role
+        // Admin: no filter (akses semua)
+        // Team Leader: hanya execution yang performed_by = user_id mereka ATAU schedule assigned_to = user_id mereka
+        // Mekanik: hanya execution yang performed_by = user_id mereka
         if (DataFilterHelper::shouldFilterRoute(request()->route()->getName())) {
-            $user = auth()->user();
-            if ($user && $user->role === 'mekanik' && $user->id) {
-                $query->where('performed_by', $user->id);
+            if ($userRole === 'team_leader' && $userId) {
+                // Team leader: filter berdasarkan performed_by atau schedule assigned_to
+                $executionQuery->where(function($q) use ($userId) {
+                    $q->where('performed_by', $userId)
+                      ->orWhereHas('schedule', function($scheduleQuery) use ($userId) {
+                          $scheduleQuery->where('assigned_to', $userId);
+                      });
+                });
+            } elseif ($userRole === 'mekanik' && $userId) {
+                $executionQuery->where('performed_by', $userId);
             }
+            // Admin dan role lain tidak perlu filter
         }
         
-        $allExecutions = $query->orderBy('scheduled_date', 'asc')->orderBy('created_at', 'desc')->get();
+        $allExecutions = $executionQuery->orderBy('scheduled_date', 'asc')->orderBy('created_at', 'desc')->get();
+        
+        // Group schedules by (machine_erp_id, start_date) to get unique jadwal
+        $scheduleJadwalData = [];
+        foreach ($schedules as $schedule) {
+            $machineId = $schedule->machine_erp_id;
+            $startDate = $schedule->start_date;
+            if (is_string($startDate)) {
+                $dateFormatted = $startDate;
+            } else {
+                $dateFormatted = \Carbon\Carbon::parse($startDate)->format('Y-m-d');
+            }
+            $key = $machineId . '_' . $dateFormatted;
+            
+            if (!isset($scheduleJadwalData[$key])) {
+                $scheduleJadwalData[$key] = [
+                    'machine_id' => $machineId,
+                    'machine' => $schedule->machineErp,
+                    'scheduled_date' => $dateFormatted,
+                    'schedules' => [],
+                    'has_execution' => false,
+                ];
+            }
+            $scheduleJadwalData[$key]['schedules'][] = $schedule;
+        }
         
         // Group all executions by (machine_erp_id, scheduled_date) 
         // For each jadwal, use only the LATEST execution (1 jadwal = 1 execution)
-        $allJadwalData = [];
+        $executionJadwalData = [];
         foreach ($allExecutions as $execution) {
             $machineId = $execution->schedule->machine_erp_id;
             $scheduledDate = $execution->scheduled_date;
@@ -45,37 +104,60 @@ class UpdatingController extends Controller
             $key = $machineId . '_' . $dateFormatted;
             
             // For each jadwal, only keep the latest execution (most recent created_at)
-            if (!isset($allJadwalData[$key])) {
-                $allJadwalData[$key] = [
+            if (!isset($executionJadwalData[$key])) {
+                $executionJadwalData[$key] = [
                     'machine_id' => $machineId,
                     'machine' => $execution->schedule->machineErp,
                     'scheduled_date' => $dateFormatted,
                     'latest_execution' => $execution, // Store only the latest execution
+                ];
+            } else {
+                // Update if this execution is newer (later created_at)
+                if ($execution->created_at > $executionJadwalData[$key]['latest_execution']->created_at) {
+                    $executionJadwalData[$key]['latest_execution'] = $execution;
+                }
+            }
+        }
+        
+        // Merge schedule jadwal with execution jadwal
+        // Priority: execution data if exists, otherwise use schedule data
+        $allJadwalData = [];
+        foreach ($scheduleJadwalData as $key => $scheduleJadwal) {
+            if (isset($executionJadwalData[$key])) {
+                // Jadwal sudah ada execution
+                $execution = $executionJadwalData[$key]['latest_execution'];
+                $allJadwalData[$key] = [
+                    'machine_id' => $scheduleJadwal['machine_id'],
+                    'machine' => $scheduleJadwal['machine'],
+                    'scheduled_date' => $scheduleJadwal['scheduled_date'],
+                    'latest_execution' => $execution,
                     'has_pending' => false,
                     'has_in_progress' => false,
                     'has_completed' => false,
                 ];
-            } else {
-                // Update if this execution is newer (later created_at)
-                if ($execution->created_at > $allJadwalData[$key]['latest_execution']->created_at) {
-                    $allJadwalData[$key]['latest_execution'] = $execution;
-                }
-            }
             
             // Update status flags based on latest execution
-            $latestExec = $allJadwalData[$key]['latest_execution'];
-            if ($latestExec->status == 'pending') {
+                if ($execution->status == 'pending') {
                 $allJadwalData[$key]['has_pending'] = true;
-                $allJadwalData[$key]['has_in_progress'] = false;
-                $allJadwalData[$key]['has_completed'] = false;
-            } elseif ($latestExec->status == 'in_progress') {
+                } elseif ($execution->status == 'in_progress') {
                 $allJadwalData[$key]['has_in_progress'] = true;
-                $allJadwalData[$key]['has_pending'] = false;
-                $allJadwalData[$key]['has_completed'] = false;
-            } elseif ($latestExec->status == 'completed') {
+                } elseif ($execution->status == 'completed') {
                 $allJadwalData[$key]['has_completed'] = true;
-                $allJadwalData[$key]['has_pending'] = false;
-                $allJadwalData[$key]['has_in_progress'] = false;
+                }
+            } else {
+                // Jadwal belum ada execution - tampilkan sebagai pending
+                // Ambil schedule pertama untuk membuat execution virtual
+                $firstSchedule = $scheduleJadwal['schedules'][0];
+                $allJadwalData[$key] = [
+                    'machine_id' => $scheduleJadwal['machine_id'],
+                    'machine' => $scheduleJadwal['machine'],
+                    'scheduled_date' => $scheduleJadwal['scheduled_date'],
+                    'latest_execution' => null, // Belum ada execution
+                    'first_schedule' => $firstSchedule, // Untuk membuat execution nanti
+                    'has_pending' => true, // Default pending karena belum ada execution
+                    'has_in_progress' => false,
+                    'has_completed' => false,
+                ];
             }
         }
         
@@ -86,18 +168,19 @@ class UpdatingController extends Controller
             $latestExecution = $jadwal['latest_execution'];
             
             // Skip jadwal that already has completed status (latest execution is completed)
-            if ($latestExecution->status == 'completed') {
+            if ($latestExecution && $latestExecution->status == 'completed') {
                 continue;
             }
             
-            // Only include jadwal with pending or in_progress status (latest execution)
-            if ($latestExecution->status == 'pending' || $latestExecution->status == 'in_progress') {
+            // Include jadwal with pending or in_progress status, or jadwal yang belum ada execution
+            if (!$latestExecution || $latestExecution->status == 'pending' || $latestExecution->status == 'in_progress') {
                 $jadwalData[$key] = [
                     'machine_id' => $jadwal['machine_id'],
                     'machine' => $jadwal['machine'],
                     'scheduled_date' => $jadwal['scheduled_date'],
-                    'executions' => [$latestExecution], // Only the latest execution
-                    'status' => $latestExecution->status,
+                    'executions' => $latestExecution ? [$latestExecution] : [], // Empty jika belum ada execution
+                    'status' => $latestExecution ? $latestExecution->status : 'pending', // Default pending jika belum ada execution
+                    'first_schedule' => $jadwal['first_schedule'] ?? null, // Untuk membuat execution nanti
                 ];
             }
         }
@@ -120,14 +203,16 @@ class UpdatingController extends Controller
         foreach ($allJadwalData as $key => $jadwal) {
             $latestExecution = $jadwal['latest_execution'];
             
-            // Only include jadwal where latest execution is completed
-            if ($latestExecution->status == 'completed') {
+            // Only include jadwal where latest execution exists and is completed
+            // Pastikan status benar-benar 'completed', bukan 'pending' atau 'in_progress'
+            if ($latestExecution && $latestExecution->status === 'completed') {
                 $completedJadwal[$key] = [
                     'machine_id' => $jadwal['machine_id'],
                     'machine' => $jadwal['machine'],
                     'scheduled_date' => $jadwal['scheduled_date'],
                     'executions' => [$latestExecution], // Only the latest execution
                     'latest_end_time' => $latestExecution->actual_end_time,
+                    'status' => 'completed', // Explicitly set status to completed
                 ];
             }
         }
@@ -164,8 +249,10 @@ class UpdatingController extends Controller
         foreach ($allJadwalData as $key => $jadwal) {
             $latestExecution = $jadwal['latest_execution'];
             
-            // Only count if latest execution is not completed
-            if ($latestExecution->status == 'pending') {
+            // Count jadwal yang belum ada execution sebagai pending
+            if (!$latestExecution) {
+                $pendingCount++;
+            } elseif ($latestExecution->status == 'pending') {
                 $pendingCount++;
             } elseif ($latestExecution->status == 'in_progress') {
                 $inProgressCount++;
@@ -188,6 +275,7 @@ class UpdatingController extends Controller
     
     /**
      * Get maintenance points by machine and date for AJAX.
+     * Mengambil data dari schedules (bukan executions) untuk menghindari duplikasi.
      */
     public function getMaintenancePointsByMachineAndDate(Request $request)
     {
@@ -198,33 +286,89 @@ class UpdatingController extends Controller
             return response()->json(['maintenance_points' => []]);
         }
         
-        $executions = PredictiveMaintenanceExecution::whereHas('schedule', function ($query) use ($machineId, $scheduledDate) {
-            $query->where('machine_erp_id', $machineId)
-                  ->whereDate('start_date', $scheduledDate);
-        })
-        ->with(['schedule.maintenancePoint', 'schedule.standard', 'performedBy'])
-        ->orderBy('id', 'asc')
-        ->get();
+        // Ensure scheduledDate is in correct format
+        if (is_string($scheduledDate)) {
+            $scheduledDate = \Carbon\Carbon::parse($scheduledDate)->format('Y-m-d');
+        } else {
+            $scheduledDate = \Carbon\Carbon::parse($scheduledDate)->format('Y-m-d');
+        }
         
+        // Get all schedules for this machine with start_date = scheduled_date
+        // Sama seperti di method edit(), untuk konsistensi
+        $schedules = PredictiveMaintenanceSchedule::where('machine_erp_id', $machineId)
+            ->where('status', 'active')
+            ->whereDate('start_date', $scheduledDate)
+            ->with(['maintenancePoint', 'standard', 'assignedUser', 'executions' => function($query) use ($scheduledDate) {
+                // Get all executions for this scheduled_date, ordered by created_at desc
+                $query->where('scheduled_date', $scheduledDate)
+                      ->orderBy('created_at', 'desc');
+            }])
+            ->orderBy('maintenance_point_id')
+            ->get();
+        
+        // Remove duplicates based on maintenance_point_id to ensure unique points
+        $uniqueSchedules = collect();
+        $seenPointIds = [];
+        
+        foreach ($schedules as $schedule) {
+            $pointId = $schedule->maintenance_point_id;
+            
+            // If no maintenance_point_id, use schedule id as unique identifier
+            if (!$pointId) {
+                $uniqueSchedules->push($schedule);
+                continue;
+            }
+            
+            // Only add if we haven't seen this point_id before
+            if (!in_array($pointId, $seenPointIds)) {
+                $seenPointIds[] = $pointId;
+                $uniqueSchedules->push($schedule);
+            }
+        }
+        
+        $schedules = $uniqueSchedules;
+        
+        // Map schedules to maintenance points data
         $maintenancePoints = [];
-        foreach ($executions as $execution) {
+        foreach ($schedules as $schedule) {
+            // Get execution for this scheduled_date - get the latest one
+            $execution = $schedule->executions
+                ->where('scheduled_date', $scheduledDate)
+                ->sortByDesc('created_at')
+                ->first();
+            
+            // If no execution found for this scheduled_date, try to get any execution for this schedule
+            // (might be from a different scheduled_date but same schedule)
+            if (!$execution) {
+                $execution = $schedule->executions
+                    ->sortByDesc('created_at')
+                    ->first();
+            }
+            
+            // Determine status - use execution status if exists, otherwise 'pending'
+            $status = 'pending';
+            if ($execution) {
+                $status = $execution->status;
+            }
+            
             $maintenancePoints[] = [
-                'execution_id' => $execution->id,
-                'schedule_id' => $execution->schedule->id,
-                'maintenance_point_name' => $execution->schedule->maintenancePoint->name ?? $execution->schedule->title,
-                'standard_name' => $execution->schedule->standard->name ?? '-',
-                'standard_unit' => $execution->schedule->standard->unit ?? '-',
-                'standard_min' => $execution->schedule->standard->min_value,
-                'standard_max' => $execution->schedule->standard->max_value,
-                'standard_target' => $execution->schedule->standard->target_value,
-                'measured_value' => $execution->measured_value,
-                'measurement_status' => $execution->measurement_status,
-                'instruction' => $execution->schedule->maintenancePoint->instruction ?? $execution->schedule->description ?? '',
-                'photo' => $execution->schedule->maintenancePoint && $execution->schedule->maintenancePoint->photo ? asset('public-storage/' . $execution->schedule->maintenancePoint->photo) : null,
-                'status' => $execution->status,
-                'performed_by' => $execution->performedBy->name ?? '-',
-                'actual_start_time' => $execution->actual_start_time ? \Carbon\Carbon::parse($execution->actual_start_time)->format('d/m/Y H:i') : '-',
-                'actual_end_time' => $execution->actual_end_time ? \Carbon\Carbon::parse($execution->actual_end_time)->format('d/m/Y H:i') : '-',
+                'execution_id' => $execution ? $execution->id : null,
+                'schedule_id' => $schedule->id,
+                'maintenance_point_id' => $schedule->maintenance_point_id,
+                'maintenance_point_name' => $schedule->maintenancePoint ? $schedule->maintenancePoint->name : $schedule->title,
+                'standard_name' => $schedule->standard ? $schedule->standard->name : '-',
+                'standard_unit' => $schedule->standard ? $schedule->standard->unit : '-',
+                'standard_min' => $schedule->standard ? $schedule->standard->min_value : null,
+                'standard_max' => $schedule->standard ? $schedule->standard->max_value : null,
+                'standard_target' => $schedule->standard ? $schedule->standard->target_value : null,
+                'instruction' => $schedule->description ?? ($schedule->maintenancePoint ? $schedule->maintenancePoint->instruction : ''),
+                'photo' => $schedule->maintenancePoint && $schedule->maintenancePoint->photo ? asset('public-storage/' . $schedule->maintenancePoint->photo) : null,
+                'measured_value' => $execution ? $execution->measured_value : null,
+                'measurement_status' => $execution ? $execution->measurement_status : null,
+                'status' => $status, // Use determined status
+                'performed_by' => $execution && $execution->performedBy ? $execution->performedBy->name : '-',
+                'actual_start_time' => $execution && $execution->actual_start_time ? \Carbon\Carbon::parse($execution->actual_start_time)->format('d/m/Y H:i') : '-',
+                'actual_end_time' => $execution && $execution->actual_end_time ? \Carbon\Carbon::parse($execution->actual_end_time)->format('d/m/Y H:i') : '-',
             ];
         }
         
@@ -232,15 +376,294 @@ class UpdatingController extends Controller
     }
     
     /**
-     * Show the form for editing the specified resource.
+     * Create execution from schedule and show edit form.
      */
-    public function edit(string $id)
+    public function createFromSchedule(Request $request)
+    {
+        $scheduleId = $request->input('schedule_id');
+        $scheduledDate = $request->input('scheduled_date');
+        
+        if (!$scheduleId || !$scheduledDate) {
+            return redirect()->route('predictive-maintenance.updating.index')
+                ->with('error', 'Schedule ID dan Scheduled Date harus diisi.');
+        }
+        
+        $schedule = PredictiveMaintenanceSchedule::with(['machineErp.machineType', 'machineErp.roomErp', 'standard', 'maintenancePoint'])
+            ->findOrFail($scheduleId);
+        
+        // Check if execution already exists
+        $existingExecution = PredictiveMaintenanceExecution::where('schedule_id', $scheduleId)
+            ->where('scheduled_date', $scheduledDate)
+            ->first();
+        
+        if ($existingExecution) {
+            return redirect()->route('predictive-maintenance.updating.edit', $existingExecution->id);
+        }
+        
+        // Create new execution with pending status
+        $execution = PredictiveMaintenanceExecution::create([
+            'schedule_id' => $scheduleId,
+            'scheduled_date' => $scheduledDate,
+            'status' => 'pending',
+        ]);
+        
+        return redirect()->route('predictive-maintenance.updating.edit', $execution->id);
+    }
+    
+    /**
+     * Show the form for editing the specified resource.
+     * Menampilkan semua maintenance points untuk machine_id dan scheduled_date.
+     * Jika parameter 'single_point' ada, hanya menampilkan point yang sesuai dengan execution_id.
+     */
+    public function edit(string $id, Request $request)
     {
         $execution = PredictiveMaintenanceExecution::with(['schedule.machineErp.machineType', 'schedule.machineErp.roomErp', 'schedule.standard', 'schedule.maintenancePoint', 'performedBy'])
             ->findOrFail($id);
-        $users = User::whereIn('role', ['mekanik', 'team_leader', 'group_leader', 'coordinator'])->get();
         
-        return view('predictive-maintenance.updating.edit', compact('execution', 'users'));
+        $machineId = $execution->schedule->machine_erp_id;
+        $scheduledDate = $execution->scheduled_date;
+        $singlePoint = $request->get('single_point', false); // Check if single point mode
+        
+        // Ensure scheduledDate is in correct format
+        if (is_string($scheduledDate)) {
+            $scheduledDate = \Carbon\Carbon::parse($scheduledDate)->format('Y-m-d');
+        } else {
+            $scheduledDate = \Carbon\Carbon::parse($scheduledDate)->format('Y-m-d');
+        }
+        
+        // Get all schedules for this machine with start_date = scheduled_date
+        // Hanya ambil schedules yang sesuai dengan tanggal yang dipilih, tidak termasuk schedule terlewat
+        // untuk menghindari duplikasi point
+        $schedules = PredictiveMaintenanceSchedule::where('machine_erp_id', $machineId)
+            ->where('status', 'active')
+            ->whereDate('start_date', $scheduledDate)
+            ->with(['maintenancePoint', 'standard', 'assignedUser', 'executions' => function($query) use ($scheduledDate) {
+                $query->where('scheduled_date', $scheduledDate)
+                      ->orderBy('created_at', 'desc');
+            }])
+            ->orderBy('maintenance_point_id')
+            ->get();
+        
+        // Remove duplicates based on maintenance_point_id to ensure unique points
+        $uniqueSchedules = collect();
+        $seenPointIds = [];
+        
+        foreach ($schedules as $schedule) {
+            $pointId = $schedule->maintenance_point_id;
+            
+            // If no maintenance_point_id, use schedule id as unique identifier
+            if (!$pointId) {
+                $uniqueSchedules->push($schedule);
+                continue;
+            }
+            
+            // Only add if we haven't seen this point_id before
+            if (!in_array($pointId, $seenPointIds)) {
+                $seenPointIds[] = $pointId;
+                $uniqueSchedules->push($schedule);
+            }
+        }
+        
+        $schedules = $uniqueSchedules;
+        
+        // Get PIC from first schedule
+        $picId = null;
+        $picName = null;
+        if ($schedules->count() > 0) {
+            $firstSchedule = $schedules->first();
+            $picId = $firstSchedule->assigned_to;
+            $picName = $firstSchedule->assignedUser ? $firstSchedule->assignedUser->name : null;
+        }
+        
+        // Map schedules to maintenance points data
+        $maintenancePoints = $schedules->map(function($schedule) use ($scheduledDate, $execution, $singlePoint) {
+            // If single point mode, use the execution passed as parameter
+            // Otherwise, get execution for this scheduled_date
+            $pointExecution = null;
+            if ($singlePoint && $schedule->id == $execution->schedule_id) {
+                // Use the execution passed as parameter (the one being edited)
+                $pointExecution = $execution;
+            } else {
+                // Get execution for this scheduled_date
+                $pointExecution = $schedule->executions
+                    ->where('scheduled_date', $scheduledDate)
+                    ->sortByDesc('created_at')
+                    ->first();
+                
+                // If no execution found for this scheduled_date, check if there's any execution for this schedule
+                if (!$pointExecution) {
+                    $pointExecution = $schedule->executions
+                        ->sortByDesc('created_at')
+                        ->first();
+                }
+            }
+            
+            return [
+                'schedule_id' => $schedule->id,
+                'maintenance_point_id' => $schedule->maintenance_point_id,
+                'maintenance_point_name' => $schedule->maintenancePoint ? $schedule->maintenancePoint->name : $schedule->title,
+                'standard_name' => $schedule->standard ? $schedule->standard->name : '-',
+                'standard_unit' => $schedule->standard ? $schedule->standard->unit : '-',
+                'standard_min' => $schedule->standard ? $schedule->standard->min_value : null,
+                'standard_max' => $schedule->standard ? $schedule->standard->max_value : null,
+                'standard_target' => $schedule->standard ? $schedule->standard->target_value : null,
+                'instruction' => $schedule->description ?? ($schedule->maintenancePoint ? $schedule->maintenancePoint->instruction : ''),
+                'photo' => $schedule->maintenancePoint && $schedule->maintenancePoint->photo ? asset('public-storage/' . $schedule->maintenancePoint->photo) : null,
+                'has_execution' => $pointExecution !== null && $pointExecution->scheduled_date == $scheduledDate,
+                'execution_id' => ($pointExecution && $pointExecution->scheduled_date == $scheduledDate) ? $pointExecution->id : null,
+                'execution_status' => ($pointExecution && $pointExecution->scheduled_date == $scheduledDate) ? $pointExecution->status : 'pending',
+                'measured_value' => ($pointExecution && $pointExecution->scheduled_date == $scheduledDate) ? $pointExecution->measured_value : null,
+                'measurement_status' => ($pointExecution && $pointExecution->scheduled_date == $scheduledDate) ? $pointExecution->measurement_status : null,
+                'performed_by' => ($pointExecution && $pointExecution->scheduled_date == $scheduledDate && $pointExecution->performedBy) ? $pointExecution->performedBy->id : null,
+                'actual_start_time' => ($pointExecution && $pointExecution->scheduled_date == $scheduledDate && $pointExecution->actual_start_time) ? \Carbon\Carbon::parse($pointExecution->actual_start_time)->format('Y-m-d\TH:i') : null,
+                'actual_end_time' => ($pointExecution && $pointExecution->scheduled_date == $scheduledDate && $pointExecution->actual_end_time) ? \Carbon\Carbon::parse($pointExecution->actual_end_time)->format('Y-m-d\TH:i') : null,
+                'findings' => ($pointExecution && $pointExecution->scheduled_date == $scheduledDate) ? $pointExecution->findings : null,
+                'actions_taken' => ($pointExecution && $pointExecution->scheduled_date == $scheduledDate) ? $pointExecution->actions_taken : null,
+                'notes' => ($pointExecution && $pointExecution->scheduled_date == $scheduledDate) ? $pointExecution->notes : null,
+                'checklist' => ($pointExecution && $pointExecution->scheduled_date == $scheduledDate) ? $pointExecution->checklist : null,
+                'photo_before' => ($pointExecution && $pointExecution->scheduled_date == $scheduledDate && $pointExecution->photo_before) ? asset('public-storage/' . $pointExecution->photo_before) : null,
+                'photo_after' => ($pointExecution && $pointExecution->scheduled_date == $scheduledDate && $pointExecution->photo_after) ? asset('public-storage/' . $pointExecution->photo_after) : null,
+            ];
+        })->values();
+        
+        // Debug: Log jumlah schedules dan maintenance points
+        \Log::info('UpdatingController@edit - Schedules count: ' . $schedules->count());
+        \Log::info('UpdatingController@edit - Maintenance points count: ' . $maintenancePoints->count());
+        \Log::info('UpdatingController@edit - Machine ID: ' . $machineId . ', Scheduled Date: ' . $scheduledDate);
+        
+        // Get only team_leader users
+        $users = User::where('role', 'team_leader')
+            ->orderBy('name')
+            ->get();
+        $machine = $execution->schedule->machineErp;
+        
+        return view('predictive-maintenance.updating.edit', compact('execution', 'users', 'maintenancePoints', 'machine', 'scheduledDate', 'picId', 'picName'));
+    }
+    
+    /**
+     * Batch update multiple executions for a jadwal.
+     */
+    public function batchUpdate(Request $request)
+    {
+        $validated = $request->validate([
+            'machine_id' => 'required|exists:machine_erp,id',
+            'scheduled_date' => 'required|date',
+            'performed_by' => 'nullable|exists:users,id',
+            'executions' => 'required|array|min:1',
+            'executions.*.schedule_id' => 'required|exists:predictive_maintenance_schedules,id',
+            'executions.*.execution_id' => 'nullable|exists:predictive_maintenance_executions,id',
+            'executions.*.status' => 'required|in:pending,in_progress,completed,skipped,cancelled',
+            'executions.*.measured_value' => 'nullable|numeric',
+            'executions.*.actual_start_time' => 'nullable|date',
+            'executions.*.actual_end_time' => 'nullable|date',
+            'executions.*.findings' => 'nullable|string',
+            'executions.*.actions_taken' => 'nullable|string',
+            'executions.*.notes' => 'nullable|string',
+            'executions.*.checklist' => 'nullable|array',
+        ]);
+
+        $executionsUpdated = 0;
+        $errors = [];
+        
+        foreach ($validated['executions'] as $index => $executionData) {
+            $schedule = PredictiveMaintenanceSchedule::findOrFail($executionData['schedule_id']);
+            
+            // Calculate measurement_status based on standard
+            $measuredValue = $executionData['measured_value'] ?? null;
+            $measurementStatus = null;
+            
+            if ($measuredValue !== null && $schedule->standard) {
+                $measurementStatus = $schedule->standard->getMeasurementStatus($measuredValue);
+            }
+            
+            // Validation: If status is completed, measured_value must be filled
+            if ($executionData['status'] === 'completed' && (empty($measuredValue) || $measuredValue === '')) {
+                $pointName = $schedule->maintenancePoint ? $schedule->maintenancePoint->name : $schedule->title;
+                $errors[] = "Point '{$pointName}' memerlukan Measured Value untuk status Completed.";
+                continue; // Skip this execution
+            }
+            
+            // Check if execution_id exists
+            $executionId = $executionData['execution_id'] ?? null;
+            
+            if ($executionId) {
+                // Update existing execution
+                $execution = PredictiveMaintenanceExecution::findOrFail($executionId);
+                
+                // Auto set start time if status changed to in_progress
+                $actualStartTime = $executionData['actual_start_time'] ?? null;
+                if ($executionData['status'] == 'in_progress' && !$actualStartTime && !$execution->actual_start_time) {
+                    $actualStartTime = now();
+                }
+                
+                // Auto set end time if status changed to completed
+                $actualEndTime = $executionData['actual_end_time'] ?? null;
+                if ($executionData['status'] == 'completed' && !$actualEndTime && !$execution->actual_end_time) {
+                    $actualEndTime = now();
+                }
+                
+                $execution->update([
+                    'status' => $executionData['status'],
+                    'measured_value' => $measuredValue,
+                    'measurement_status' => $measurementStatus,
+                    'performed_by' => $validated['performed_by'] ?? $execution->performed_by,
+                    'actual_start_time' => $actualStartTime ?? $execution->actual_start_time,
+                    'actual_end_time' => $actualEndTime ?? $execution->actual_end_time,
+                    'findings' => $executionData['findings'] ?? $execution->findings,
+                    'actions_taken' => $executionData['actions_taken'] ?? $execution->actions_taken,
+                    'notes' => $executionData['notes'] ?? $execution->notes,
+                    'checklist' => $executionData['checklist'] ?? $execution->checklist,
+                ]);
+                $executionsUpdated++;
+            } else {
+                // Create new execution if doesn't exist
+                $actualStartTime = $executionData['actual_start_time'] ?? null;
+                if ($executionData['status'] == 'in_progress' && !$actualStartTime) {
+                    $actualStartTime = now();
+                }
+                
+                $actualEndTime = $executionData['actual_end_time'] ?? null;
+                if ($executionData['status'] == 'completed' && !$actualEndTime) {
+                    $actualEndTime = now();
+                }
+                
+                // Validation: If status is completed, measured_value must be filled
+                if ($executionData['status'] === 'completed' && empty($measuredValue)) {
+                    continue; // Skip this execution
+                }
+                
+                PredictiveMaintenanceExecution::create([
+                    'schedule_id' => $executionData['schedule_id'],
+                    'scheduled_date' => $validated['scheduled_date'],
+                    'status' => $executionData['status'],
+                    'measured_value' => $measuredValue,
+                    'measurement_status' => $measurementStatus,
+                    'performed_by' => $validated['performed_by'] ?? null,
+                    'actual_start_time' => $actualStartTime,
+                    'actual_end_time' => $actualEndTime,
+                    'findings' => $executionData['findings'] ?? null,
+                    'actions_taken' => $executionData['actions_taken'] ?? null,
+                    'notes' => $executionData['notes'] ?? null,
+                    'checklist' => $executionData['checklist'] ?? null,
+                ]);
+                $executionsUpdated++;
+            }
+        }
+
+        if (!empty($errors)) {
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['executions' => $errors])
+                ->with('error', 'Beberapa execution tidak dapat diupdate: ' . implode(' ', $errors));
+        }
+
+        $message = "Berhasil update {$executionsUpdated} execution(s).";
+        if ($executionsUpdated == 0) {
+            $message = "Tidak ada execution yang diupdate.";
+        }
+
+        return redirect()->route('predictive-maintenance.updating.index')
+            ->with('success', $message);
     }
     
     /**
@@ -265,6 +688,13 @@ class UpdatingController extends Controller
             'photo_before' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'photo_after' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
+        
+        // Validation: If status is completed, measured_value must be filled
+        if ($validated['status'] === 'completed' && empty($validated['measured_value'])) {
+            return redirect()->back()
+                ->withErrors(['measured_value' => 'Measured value harus diisi jika status adalah Completed.'])
+                ->withInput();
+        }
         
         $execution = PredictiveMaintenanceExecution::findOrFail($id);
         
@@ -309,6 +739,15 @@ class UpdatingController extends Controller
         }
         
         $execution->update($validated);
+        
+        // If request is AJAX, return JSON response
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Execution berhasil diupdate.',
+                'execution' => $execution->fresh(['schedule.maintenancePoint', 'schedule.standard', 'performedBy'])
+            ]);
+        }
         
         return redirect()->route('predictive-maintenance.updating.index')
             ->with('success', 'Execution berhasil diupdate.');
